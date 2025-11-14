@@ -34,38 +34,17 @@ rule all:
   input:
     expand("data/{sampleID}/{sampleID}.bam",sampleID=SAMPLE_ls),
     expand("data/{sampleID}/{sampleID}.bam.bai",sampleID=SAMPLE_ls),
-    expand("5-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
-    expand("6-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
-    expand("4-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
+    expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
+    expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
+    expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
     "../case/samples_case.csv",
     "cleanUp_done.txt",
-
-
-rule make_data_links_ancient:
-  input:
-    sample_info_csv="data/{sampleID}/sample_info.csv",
-  output:
-    bams="data/{sampleID}/{sampleID}.bam",
-    bais="data/{sampleID}/{sampleID}.bam.bai",
-  group:
-    'make_link_group',
-  run:
-    ## create symbolic links
-    with open(input.sample_info_csv,'r') as f:
-      this_sample_info = f.readline() # only one line to read
-    this_sample_info = this_sample_info.strip('\n').split(',')
-    path = this_sample_info[0] # remember python indexing starts at 0
-    sample = this_sample_info[1]
-    providername = this_sample_info[3]
-    print(path + '\n' + sample)
-    # make links
-    makelink_ancient(path, sample, providername)
 
 rule create_freebayes_input:
   input:
     non_outgroup_bam_ls=lambda wildcards: expand("data/{sampleID}/{sampleID}.bam",reference=wildcards.reference, sampleID=ref_genome_to_non_outgroup_bams_dict[wildcards.reference]),
   output:
-    non_outgroup_bam_file="3-freebayes_input/ref_{reference}_non_outgroup_bams.txt",
+    non_outgroup_bam_file="0-freebayes_input/ref_{reference}_non_outgroup_bams.txt",
   group:
     'pileup_and_filter',
   shell:
@@ -77,8 +56,8 @@ rule freebayes_indels:
     fai="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta.fai",
     ref="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta",
   output:
-    vcf_indels="4-vcf/ref_{reference}_non_outgroup_indels_complex.vcf.gz",
-    vcf_raw="4-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",
+    vcf_indels="1-vcf/ref_{reference}_non_outgroup_indels_complex.vcf.gz",
+    vcf_raw="1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",
   conda:
     "envs/freebayes.yaml", 
   shell:
@@ -90,13 +69,13 @@ rule mpileup2vcf_ancient:
     bam=rules.make_data_links_ancient.output.bams,
     ref="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta",
   output:
-    pileup="4-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
-    variants="4-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
-    vcf_strain="4-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
+    pileup="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
+    variants="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
+    vcf_strain="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
   group:
     'pileup_and_filter', 
   params:
-    vcf_raw="4-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
+    vcf_raw="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
   conda:
     "envs/samtools15_bcftools12.yaml"
   shell:
@@ -114,7 +93,7 @@ rule vcf2quals_ancient:
   params:
     refGenomeDir="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/"
   output:
-    file_quals = "5-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz",
+    file_quals = "2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz",
   group:
     'pileup_and_filter',
   run:
@@ -128,8 +107,8 @@ rule pileup2diversity_matrix_ancient:
   params:
     refGenomeDir="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/",
   output:
-    file_diversity = "6-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz",
-    file_coverage = "6-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.coverage.npz",
+    file_diversity = "3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz",
+    file_coverage = "3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.coverage.npz",
   group:
     'pileup_and_filter',
   run:
@@ -140,8 +119,8 @@ rule remove_pileup_ancient:
   input:
     pileup = rules.mpileup2vcf_ancient.output.pileup,
   params:
-    file_diversity = "6-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz",
-    file_coverage = "6-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.coverage.npz",
+    file_diversity = "3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz",
+    file_coverage = "3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.coverage.npz",
   group:
     'pileup_and_filter',
   shell:
@@ -149,8 +128,8 @@ rule remove_pileup_ancient:
 
 rule cleanUp_ancient:
   input:
-    part1 = expand("5-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input not used, only required so snakemake waits with clean up until the end
-    part2 = expand("6-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input not used, only required so snakemake waits with clean up until the end
+    part1 = expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input not used, only required so snakemake waits with clean up until the end
+    part2 = expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input not used, only required so snakemake waits with clean up until the end
   output:
     "cleanUp_done.txt",
   shell:
@@ -160,9 +139,8 @@ rule generate_next_samplescsv:
   input: 
     csv = "samples.csv",
   output:
-    case_csv = "../case/samples_case.csv",
+    case_csv = "samples_case.csv",
   shell: 
-    """ mkdir -p ../case ;"""
     """ echo 'Path,Sample,ReferenceGenome,Outgroup' > {output.case_csv} ;"""
     " dir=$(pwd) ;"
     """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$6}}' {input.csv} >> {output.case_csv} ;"""
