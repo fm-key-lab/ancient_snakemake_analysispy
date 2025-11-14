@@ -44,40 +44,13 @@ rule all:
         # expand("data/qual/{sampleID}_ref_{reference}_outgroup{outgroup}.quals.mat",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
         # expand("data/diversity/{sampleID}_ref_{reference}_outgroup{outgroup}.diversity.mat",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
         # # Everything # #
-        expand("2-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",reference=set(REF_Genome_ls)) ## for each unique entry (set()) the output is expected
+        expand("4-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",reference=set(REF_Genome_ls)) ## for each unique entry (set()) the output is expected
         # # Including cleanup step # #
         #"logs/DONE_cleanUp",
 
-
-rule build_data_links:
-    output:
-        vcf_links = expand("data/vcf/{sampleID}_ref_{reference}_outgroup{outgroup}.vcf.gz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-        qual_mat_links = expand("data/qual/{sampleID}_ref_{reference}_outgroup{outgroup}.quals.npz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-        div_mat_links = expand("data/diversity/{sampleID}_ref_{reference}_outgroup{outgroup}.diversity.npz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-        vcf_indel_links = expand("data/vcf/ref_{reference}_non_outgroup_indels_complex.vcf.gz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-    log:
-        "logs/build_links.log",
-    run:
-        import subprocess
-        subprocess.run( "rm -fr data/ " ,shell=True) # clean it up prior run
-        subprocess.run( "mkdir -p data/vcf/ data/qual/ data/diversity/ " ,shell=True)
-        ## indelVCF generated only once per reference genome used 
-        for i in range(len(REF_Genomes)):
-            subprocess.run( "ln -fs -T " + PATH_ls[i] + "/4-vcf/ref_" + REF_Genomes[i] + "_non_outgroup_indels_complex.vcf.gz data/vcf/ref_" + REF_Genomes[i] + "_non_outgroup_indels_complex.vcf.gz", shell=True)
-        for i in range(len(SAMPLE_ls)):
-            subprocess.run( "ln -fs -T " + PATH_ls[i] + "/6-diversity/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "*diversity.npz data/diversity/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "_outgroup" + OUTGROUP_ls[i] + ".diversity.npz" ,shell=True)
-            subprocess.run( "ln -fs -T " + PATH_ls[i] + "/5-quals/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "*quals.npz data/qual/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "_outgroup" + OUTGROUP_ls[i] + ".quals.npz" ,shell=True)
-            subprocess.run( "ln -fs -T " + PATH_ls[i] + "/4-vcf/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "*variant.vcf.gz data/vcf/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "_outgroup" + OUTGROUP_ls[i] + ".vcf.gz " ,shell=True)
-
-
-
-
-mat_positions = lambda wildcards: expand(expand("0-temp_pos/{{sampleID}}_ref_{reference}_outgroup{{outgroup}}_positions.npz",reference=wildcards.reference),zip,sampleID=SAMPLE_per_ref_dict[wildcards.reference],outgroup=OUTGROUP_per_ref_dict[wildcards.reference]), ## Expand at first over the wildcard reference genome and mask the other two wildcarfs (done with the '{{}}'. Then, as just the zipped output is expected, zip the other two wildcards together
-quals_mat = lambda wildcards: expand(expand("2-quals/{{sampleID}}_ref_{reference}_aligned.sorted.strain.variant.quals.npz",reference=wildcards.reference),sampleID=SAMPLE_per_ref_dict[wildcards.reference]),
-
 rule variants2positions:
     input:
-        variants = "1-vcf/{sampleID}_ref_{reference}_variant.vcf.gz",
+        variants = "1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
     params:
         REF_GENOME_DIRECTORY = "/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/",
         outgroup_tag = "{outgroup}", # boolean (0==ingroup or 1==outgroup)
@@ -177,9 +150,9 @@ rule candidate_mutation_table:
         string_outgroup_bool = "0-temp_pos/{reference}/string_outgroup_bool.txt",
         string_indel_vcf = "1-vcf/ref_{reference}_non_outgroup_indels_complex.vcf.gz"
     output:
-        candidate_mutation_table = "2-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",
-        raw_sparse_cov_matrix = "2-candidate_mutation_table/{reference}/cov_raw_sparsecsr_mat.npz",
-        double_norm_sparse_cov_matrix = "2-candidate_mutation_table/{reference}/cov_norm_sparsecsr_mat.npz", ## sparse coverage matrix normalized over samples and positions 
+        candidate_mutation_table = "4-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",
+        raw_sparse_cov_matrix = "4-candidate_mutation_table/{reference}/cov_raw_sparsecsr_mat.npz",
+        double_norm_sparse_cov_matrix = "4-candidate_mutation_table/{reference}/cov_norm_sparsecsr_mat.npz", ## sparse coverage matrix normalized over samples and positions 
     params:
         REF_GENOME_DIRECTORY = "/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/"
     group:
