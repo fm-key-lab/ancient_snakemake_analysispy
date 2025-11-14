@@ -40,6 +40,26 @@ rule all:
     "../case/samples_case.csv",
     "cleanUp_done.txt",
 
+rule make_data_links_ancient:
+  input:
+    sample_info_csv="data/{sampleID}/sample_info.csv",
+  output:
+    bams="data/{sampleID}/{sampleID}.bam",
+    bais="data/{sampleID}/{sampleID}.bam.bai",
+  group:
+    'make_link_group',
+  run:
+    ## create symbolic links
+    with open(input.sample_info_csv,'r') as f:
+      this_sample_info = f.readline() # only one line to read
+    this_sample_info = this_sample_info.strip('\n').split(',')
+    path = this_sample_info[0] # remember python indexing starts at 0
+    sample = this_sample_info[1]
+    providername = this_sample_info[3]
+    print(path + '\n' + sample)
+    # make links
+    makelink_ancient(path, sample, providername)
+
 rule create_freebayes_input:
   input:
     non_outgroup_bam_ls=lambda wildcards: expand("data/{sampleID}/{sampleID}.bam",reference=wildcards.reference, sampleID=ref_genome_to_non_outgroup_bams_dict[wildcards.reference]),
