@@ -14,6 +14,8 @@ from read_move_link_samplesCSV import *
 ## Define couple of lists from samples.csv
 ## Format: Path,Sample,ReferenceGenome,ProviderName,Subject
 
+minMAF = 0.1
+
 ## modified format to Path,Sample,ReferenceGenome,OutGroup 
 ## NOTE: samples should be deduplicated bam files
 spls = "samples.csv"
@@ -96,13 +98,14 @@ rule mpileup2vcf_ancient:
     'pileup_and_filter', 
   params:
     vcf_raw="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
+    minMAF = minMAF.
   conda:
     "envs/samtools15_bcftools12.yaml"
   shell:
     " samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bam} > {output.pileup} ;"
     " samtools mpileup -q30 -t SP -d3000 -vf {input.ref} {input.bam} > {params.vcf_raw} ;"
     " bcftools call -c -Oz -o {output.vcf_strain} {params.vcf_raw} ;"
-    " bcftools view -Oz -v snps -q .1 {output.vcf_strain} > {output.variants} ;"
+    " bcftools view -Oz -v snps -q {params.minMAF} {output.vcf_strain} > {output.variants} ;"
     " tabix -p vcf {output.variants} ;"
     " rm {params.vcf_raw}"
 

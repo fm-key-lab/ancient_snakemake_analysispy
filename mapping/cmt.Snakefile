@@ -1,5 +1,5 @@
 #########################################
-# LIEBERMAN LAB SNAKEFILE FOR CASE STEP #
+# Ancient DNA CMT Generation SNAKEFILE  #
 #########################################
 
 # Version History:
@@ -54,12 +54,13 @@ rule variants2positions:
     params:
         REF_GENOME_DIRECTORY = "/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/",
         outgroup_tag = "{outgroup}", # boolean (0==ingroup or 1==outgroup)
+        maxFQ = maxFQ
     output:
         mat_positions = "0-temp_pos/{sampleID}_ref_{reference}_outgroup{outgroup}_positions.npz",
     group:
         "var2pos",
     run:
-        generate_positions_single_sample_snakemake_withoutbool(input.variants, output.mat_positions, maxFQ, params.REF_GENOME_DIRECTORY, params.outgroup_tag)
+        generate_positions_single_sample_snakemake_withoutbool(input.variants, output.mat_positions, params.maxFQ, params.REF_GENOME_DIRECTORY, params.outgroup_tag)
 
 
 ## combination steps are done per reference genome, double expand is therefore needed!
@@ -86,13 +87,14 @@ rule combine_positions:
         string_outgroup_bool = "0-temp_pos/{reference}/string_outgroup_bool.txt",
     params:
         file_other_p_to_consider = "add_positions/other_positions.npz", ## candidate positions which could be added manually 
-        REF_GENOME_DIRECTORY = "/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/"
+        REF_GENOME_DIRECTORY = "/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/",
+        maxFQ = maxFQ
     output:
         mat_positions = "0-temp_pos/{reference}/allpositions.npz",
     group:
         "pre_cand_mut_table",
     run:
-        combine_positions_snakemake_out(input.string_input_p_positions, params.file_other_p_to_consider, output.mat_positions, input.string_outgroup_bool, params.REF_GENOME_DIRECTORY, maxFQ)
+        combine_positions_snakemake_out(input.string_input_p_positions, params.file_other_p_to_consider, output.mat_positions, input.string_outgroup_bool, params.REF_GENOME_DIRECTORY, params.maxFQ)
 
 
 # build input for candidate_mutation_table
