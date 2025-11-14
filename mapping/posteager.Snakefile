@@ -37,7 +37,7 @@ rule all:
     expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
-    "../case/samples_case.csv",
+    "samples_case.csv",
     "cleanUp_done.txt",
 
 rule make_data_links_ancient:
