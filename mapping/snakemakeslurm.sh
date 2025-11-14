@@ -16,7 +16,23 @@ mkdir -p logs
 conda config --set ssl_verify no
 
 ## activate snakemake conda env
-source /u/iclight/bin/miniconda3/bin/activate snakemake
+activate_conda_path=$(echo $CONDA_EXE | sed 's#bin/conda#bin/activate#g')
+source ${activate_conda_path} snakemake
+
+## Check if slurm_status.py is executable and change if not
+if [[ ! -x "scripts/slurm_status_script.py" ]]
+then
+    chmod +x scripts/slurm_status_script.py;
+    echo "Changed 'scripts/slurm_status_script.py' to executable";
+fi
+
+## Check if email has been updated
+email_update=$(grep "UPDATE_EMAIL_ADDRESS" cluster.slurm.json)
+[ ! ${#email_update} -eq 0 ] && echo "Please modify cluster.slurm.json to include your email address for error reporting" && exit 1
+
+## create tmp and conda storage directory in /ptmp/ (if not already present)
+mkdir -p /ptmp/${USER}/tmp
+mkdir -p /nexus/posix0/MPIIB-keylab/snakemake_conda_envs/
 
 ## Check if slurm_status.py is executable and change if not
 if [[ ! -x "scripts/slurm_status.py" ]]
@@ -26,19 +42,37 @@ then
 fi
 
 snakemake -p \
+    --snakefile posteager.Snakefile \
     $* \
     --latency-wait 60 \
     -j 100 \
     --cluster-config $(dirname $0)/cluster.slurm.json \
     --cluster "sbatch ${SM_ARGS}" \
     --cluster-status scripts/slurm_status.py \
-    --default-resources "tmpdir='/ptmp/iclight/tmp'" \
+    --default-resources "tmpdir='/ptmp/${USER}/tmp'" \
     --rerun-incomplete \
-    --restart-times 3 \
+    --restart-times 1 \
     --keep-going \
     --use-conda \
     --conda-prefix /nexus/posix0/MPIIB-keylab/snakemake_conda_envs/ \
-    --group-components make_link_group=100000
+    --group-components make_link_group=100000 \
+&& \
+snakemake -p \
+    --snakefile cmt.Snakefile \
+    $* \
+    --latency-wait 60 \
+    -j 100 \
+    --cluster-config $(dirname $0)/cluster.slurm.json \
+    --cluster "sbatch ${SM_ARGS}" \
+    --cluster-status scripts/slurm_status_script.py \
+    --default-resources "tmpdir='/ptmp/${USER}/tmp'" \
+    --group-components var2pos=200 \
+    --rerun-incomplete \
+    --restart-times 1 \
+    --keep-going \
+    --use-conda \
+    --conda-prefix /nexus/posix0/MPIIB-keylab/snakemake_conda_envs/
+
 
     #--dry-run \
     #--group-components \
