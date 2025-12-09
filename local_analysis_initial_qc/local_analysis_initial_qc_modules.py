@@ -406,38 +406,49 @@ def parse_bed_zero_covg_regions(path_to_bed_zero_covg_covg, p, scafNames, chrSta
     return should_be_masked
 
 # filtering
-def findrecombinantSNPs(p, mutantAF, distance_for_nonsnp, corr_threshold_recombination,call_matrix_failing_qc=[]):
-    """
-    Retruns highly correlated positoins, with optional masking of positions that fail some QC check (eg not enough covg --> call of N)
-    NOTE: By default, SNPs called N will be factored into the correlation matrix, not recommended with ancient data (!!)
-    hackathon add default behavior (either by using calls matrix (but does covar matrix work with that? or just has mut and calls matrix))
-    """
-    if len(call_matrix_failing_qc)==0:
-        print("No masking of SNPs not called across comparisson. This can make you miss highly-correlated SNPs!")
-        print("Consider creating a calls-sized matrix of positions that failed any of the QC checks.")
-    print(f'{len(p)} sites will be evaluated for indications of recombination events.')
-    #look for recombination regions
-    nonsnp_idx = np.zeros(0,dtype='int')
-    for i in range(len(p)):
-        if i%2000 == 0: ## print pattern to stdout to show where in evaluation process runs 
-            if i%10000 == 0:
-                print('|', end = '')
+def create_ranges(test_p,dist_to_run):
+    # much more efficient version of old check for recombination range creation
+    # including automatic ignoring of redundant ranges
+    # runs in ~O(N) time
+    current_index_limit_leading=0
+    current_index_limit_trailing=0
+    range_to_check_set=set()
+    max_p_index=len(test_p)
+    for position in test_p:
+        # iterate up trailing limit
+        lower_lim=position-dist_to_run
+        while test_p[current_index_limit_trailing] < lower_lim:
+            current_index_limit_trailing +=1
+        # iterate up leading limit
+        upper_lim=position+dist_to_run
+        while test_p[current_index_limit_leading] < upper_lim:
+            if current_index_limit_leading == max_p_index-1:
+                break
             else:
-                print('.', end = '')
-        gp = p[i]
-        #find nearby snps
-        if gp > distance_for_nonsnp:
-            region = np.array(np.where((p > gp - distance_for_nonsnp) & (p < gp + distance_for_nonsnp)) ).flatten()
-            if len(region)>1: 
-                r = mutantAF[region,:]
-                if len(call_matrix_failing_qc) > 0:
-                    calls_masked_any_sample=(np.sum(call_matrix_failing_qc[region,:],axis=0)>0)
-                    r_only_unmasked_samples=r[:,~calls_masked_any_sample]
-                    corrmatrix = np.corrcoef(r_only_unmasked_samples)
-                else:
-                    corrmatrix = np.corrcoef(r)
-                [a,b]=np.where(corrmatrix > corr_threshold_recombination)
-                nonsnp_idx=np.concatenate((nonsnp_idx,region[a[np.where(a!=b)]]))
+                current_index_limit_leading +=1
+        range_to_check_set.add((current_index_limit_trailing,current_index_limit_leading))
+    return range_to_check_set
+
+
+def findrecombinantSNPs(p, mutantAF, distance_for_nonsnp, corr_threshold_recombination,call_matrix_failing_qc=[]):
+    # find ranges:
+    ranges_to_search=create_ranges(p,distance_for_nonsnp)
+    # prepare output and check that ranges exist
+    nonsnp_idx = np.zeros(0,dtype='int')
+    if len(ranges_to_search) == 0:
+        return nonsnp_idx,np.zeros(p.shape)
+    # iterate over range to ID highly correlated SNPs
+    for range_start,range_end in ranges_to_search:
+        region = p[range_start:range_end+1]
+        r = mutantAF[region,:]
+        if len(call_matrix_failing_qc) > 0:
+            calls_masked_any_sample=(np.sum(call_matrix_failing_qc[region,:],axis=0)>0)
+            r_only_unmasked_samples=r[:,~calls_masked_any_sample]
+            corrmatrix = np.corrcoef(r_only_unmasked_samples)
+        else:
+            corrmatrix = np.corrcoef(r)
+        [a,b]=np.where(corrmatrix > corr_threshold_recombination)
+        nonsnp_idx=np.concatenate((nonsnp_idx,region[a[np.where(a!=b)]]))
     nonsnp_idx=np.unique(nonsnp_idx)
     ## print number of sites which have indication for recombination
     print('\n' + str(nonsnp_idx.shape[0]) + ' of a total ' + str(p.shape[0]) + ' ('  + str((len(nonsnp_idx)/len(p))*100) + '%) positions in goodpos were found to be recombinant.')
