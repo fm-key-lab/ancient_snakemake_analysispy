@@ -6,10 +6,9 @@
         "save_fasta":true
     },
     "sample_labelling":{
+        "comment":"Please note: double escape character (\\\\) necessary in ALL regex or literal use of forward slash",
         "outgroup_pattern": "",
-        "outgroup_name": "",
-        "ancient_pattern":"^SP\.*|^M219",
-        "ancient_name":""
+        "outgroup_name": ""
     },
     "filtering": {
         "filter_parameter_sample_across_sites": {
