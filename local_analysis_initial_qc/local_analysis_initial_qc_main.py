@@ -341,20 +341,13 @@ def main(parameter_json):
         outgroup_sample = json_parsed['sample_labelling']['outgroup_name']
         outgroup_bool = np.isin(sampleNames,[f'{outgroup_sample}'])
     elif len(json_parsed['sample_labelling']['outgroup_pattern']) > 0:
-        outgroup_pattern = re.compile(fr'{json_parsed['sample_labelling']['outgroup_pattern']}')
+        outgroup_pattern = re.compile(fr'{json_parsed['sample_labelling']['outgroup_pattern'].replace}')
         outgroup_bool = np.isin(sampleNames,list(filter(outgroup_pattern.match, sampleNames)))
     else:
         outgroup_bool=np.zero(len(sampleNames)).astype(bool)
 
-    # ID ancient samples
-    if len(json_parsed['sample_labelling']['ancient_name']) > 0:
-        ancient_sample = json_parsed['sample_labelling']['ancient_name']
-        ancient_bool = np.isin(sampleNames,[f'{ancient_sample}'])
-    elif len(json_parsed['sample_labelling']['ancient_pattern']) > 0:
-        ancient_pattern = re.compile(fr'{json_parsed['sample_labelling']['ancient_pattern']}')
-        ancient_bool = np.isin(sampleNames,list(filter(ancient_pattern.match, sampleNames)))
-    else:
-        ancient_bool=np.zero(len(sampleNames)).astype(bool)
+    ancient_pattern = re.compile(r'^SP\.*|^M219')
+    ancient_bool = np.isin(sampleNames,list(filter(ancient_pattern.match, sampleNames)))
 
 
     # =============================================================================
