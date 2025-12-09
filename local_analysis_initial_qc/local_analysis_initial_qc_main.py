@@ -341,7 +341,7 @@ def main(parameter_json):
         outgroup_sample = json_parsed['sample_labelling']['outgroup_name']
         outgroup_bool = np.isin(sampleNames,[f'{outgroup_sample}'])
     elif len(json_parsed['sample_labelling']['outgroup_pattern']) > 0:
-        outgroup_pattern = re.compile(fr'{json_parsed['sample_labelling']['outgroup_pattern'].replace}')
+        outgroup_pattern = re.compile(fr'{json_parsed["sample_labelling"]["outgroup_pattern"].replace}')
         outgroup_bool = np.isin(sampleNames,list(filter(outgroup_pattern.match, sampleNames)))
     else:
         outgroup_bool=np.zero(len(sampleNames)).astype(bool)
