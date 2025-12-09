@@ -341,7 +341,7 @@ def main(parameter_json):
         outgroup_pattern = re.compile(fr'{json_parsed["sample_labelling"]["outgroup_pattern"].replace}')
         outgroup_bool = np.isin(sampleNames,list(filter(outgroup_pattern.match, sampleNames)))
     else:
-        outgroup_bool=np.zero(len(sampleNames)).astype(bool)
+        outgroup_bool=np.zeros(len(sampleNames)).astype(bool)
 
     ancient_pattern = re.compile(r'^SP\.*|^M219')
     ancient_bool = np.isin(sampleNames,list(filter(ancient_pattern.match, sampleNames)))

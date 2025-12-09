@@ -8,7 +8,7 @@
     "sample_labelling":{
         "comment":"Please note: double escape character (\\\\) necessary in ALL regex or literal use of forward slash",
         "outgroup_pattern": "",
-        "outgroup_name": ""
+        "outgroup_name": "SRR5598901"
     },
     "filtering": {
         "filter_parameter_sample_across_sites": {
