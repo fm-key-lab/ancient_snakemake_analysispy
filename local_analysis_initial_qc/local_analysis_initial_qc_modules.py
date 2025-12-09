@@ -563,16 +563,14 @@ def find_calls_near_heterozygous_sites(p, minorAF, distance_to_check, heterozygo
         print('Conducting nearby heterozygosity check on all samples, note: this filter should only be applied to ancient samples!')
         indices_of_ancient_samples=np.array([x for x in range(0,minorAF.shape[1])])
     site_samples_to_mask = np.full(minorAF.shape,False)
-    for i in range(len(p)):
-        gp = p[i]
-        #find nearby snps
-        if gp > distance_to_check:
-            region = np.array(np.where((p > gp - distance_to_check) & (p < gp + distance_to_check)) ).flatten()
-            if len(region)>1: 
-                r = minorAF[region,:]
-                for sample_index in indices_of_ancient_samples:
-                    if np.any(r[:,sample_index]>heterozygosity_threshold):
-                        site_samples_to_mask[region,sample_index]=True
+    ranges_to_search=create_ranges(p,distance_to_check)
+    for range_start,range_end in ranges_to_search:
+        region = p[range_start:range_end+1]
+        if len(region)>1: 
+            r = minorAF[region,:]
+            for sample_index in indices_of_ancient_samples:
+                if np.any(r[:,sample_index]>heterozygosity_threshold):
+                    site_samples_to_mask[region,sample_index]=True
     return site_samples_to_mask
 
 ###################################################################################################
