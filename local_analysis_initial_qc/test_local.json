@@ -1,7 +1,7 @@
 {
     "input_output":{
         "input_directory": "/home/light/local_analysis_initial_qc/Senterica_MLST/",
-        "ref_directory": "/home/light/local_analysis_initial_qc/test_local.json",
+        "ref_directory": "/home/light/local_analysis_initial_qc/Senterica_MLST/",
         "runtime_name": "initial_defaults",
         "save_fasta":true
     },
