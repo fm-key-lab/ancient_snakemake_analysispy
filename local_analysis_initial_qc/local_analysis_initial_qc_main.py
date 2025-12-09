@@ -245,10 +245,7 @@ def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage
     print('Checking parsing for analysis_params_output_name - - - PARSING OK?:', analysis_params_output_name == analysis_params_output_name_loaded)
 
 def validate_json(pared_json):
-    if not os.path.exists(f'{pared_json}'):
-        print(f'Path for parameter json file not found: {pared_json}')
-        print(f'Please ensure the input path exists')
-        raise FileNotFoundError
+    pass
 
 def main(parameter_json):
     with open(f'{parameter_json}') as f_in:
