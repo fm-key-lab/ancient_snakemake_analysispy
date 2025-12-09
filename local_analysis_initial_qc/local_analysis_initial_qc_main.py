@@ -30,12 +30,6 @@ parser = argparse.ArgumentParser(
                     prog='local_analysis_initial_qc_main',
                     description='Runs initial QC to reduce the size of candidate mutation table, based on various filtering metrics')
 
-parser.add_argument('-i', '--input_directory',
-                    help='input directory containing the CMT (full path or relative path)')           # positional argument
-parser.add_argument('-r', '--reference_directory',
-                    help='directory containing the reference genome (genome.fasta) and .gff (full path or relative path)')      # option that takes a value
-parser.add_argument('-w', '--write_fasta', action='store_true', 
-                    help='Generate fasta file based on parameters in parameter_json')
 parser.add_argument('-p', '--parameter_json', 
                     help='Parameters for running initial QC')
 
@@ -44,32 +38,37 @@ parser.add_argument('-p', '--parameter_json',
 def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample):
     # Witin sample checks
     ## Filter per mutation
-    failed_quals = (quals < filter_parameter_site_per_sample['min_qual_for_call'])
-    failed_maf=(maf < filter_parameter_site_per_sample['min_maf_for_call'])
-    failed_forward=(coverage_forward_strand < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
-    failed_reverse=(coverage_reverse_strand < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
-    failed_cov=(coverage_reverse_strand + coverage_forward_strand < filter_parameter_site_per_sample['min_cov_on_pos'])
-    failed_indels=(indels > (0.5*coverage) )
+    failed_within_sample_output_path=f'failed_within_sample.txt'
+    if os.path.exists(f'{failed_within_sample_output_path}'):
+        failed_within_sample = np.read_csv(f'{failed_within_sample_output_path}')
+    else:
+        failed_quals = (quals < filter_parameter_site_per_sample['min_qual_for_call'])
+        failed_maf=(maf < filter_parameter_site_per_sample['min_maf_for_call'])
+        failed_forward=(coverage_forward_strand < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
+        failed_reverse=(coverage_reverse_strand < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
+        failed_cov=(coverage_reverse_strand + coverage_forward_strand < filter_parameter_site_per_sample['min_cov_on_pos'])
+        failed_indels=(indels > (0.5*coverage) )
 
-    # summarize and output
-    failed_within_sample = (failed_quals | failed_maf | failed_forward | failed_reverse | failed_cov | failed_indels)
+        # summarize and output
+        failed_within_sample = (failed_quals | failed_maf | failed_forward | failed_reverse | failed_cov | failed_indels)
+        np.savetxt(f'{failed_within_sample_output_path}',failed_within_sample)
     return failed_within_sample
 
-def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_sample_bool,filter_parameter_site_across_samples,failed_any_QC):
-    failed_recombinant_output_path=f'{failed_recombinant_output_path}'
-    recombination_distance=filter_parameter_site_across_samples['distance_threshold_recombination']
-    recombination_correlation=filter_parameter_site_across_samples['correlation_threshold_recombination']
+def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC):
+    failed_recombinant_output_path=f'failed_recombinant.txt'
     if os.path.exists(f'{failed_recombinant_output_path}'):
-        failed_recombinants = np.read_csv(failed_recombinants)
-    elif optional_filtering['recombination'] == 'Ancient':
-        failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ancient_sample_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ancient_sample_bool ] )[1]
-        np.savetxt(f'{failed_recombinant_output_path}',failed_recombinants)
-    elif optional_filtering['recombination'] == 'All':
-        failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ingroup_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ingroup_bool ] )[1]
+        failed_recombinants = np.read_csv(f'{failed_recombinant_output_path}')
+    else:
+        recombination_distance=filter_parameter_site_across_samples['distance_threshold_recombination']
+        recombination_correlation=filter_parameter_site_across_samples['correlation_threshold_recombination']
+        if optional_filtering['recombination'] == 'Ancient':
+            failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ancient_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ancient_bool ] )[1]
+        elif optional_filtering['recombination'] == 'All':
+            failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ingroup_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ingroup_bool ] )[1]
         np.savetxt(f'{failed_recombinant_output_path}',failed_recombinants)
     return failed_recombinants
 
-def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_sample_bool):
+def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
     """
     TODO: implement in snakemake
     # Metagenomic checks
@@ -79,19 +78,25 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_sample_bool):
     bed_zero_covg_path = 'bed_files/final_out_files/*_merged_zero_covg_regions.tsv.gz'
 
     failed_genomic_islands = apy.filter_bed_0_cov_regions(bed_zero_covg_path,p,scafNames,chrStarts,sampleNames,filter_parameter_site_per_sample['max_prop_0_covg_ancient'])
-    failed_genomic_islands[:,~ancient_sample_bool]=False
+    failed_genomic_islands[:,~ancient_bool]=False
 
     failed_coverage_percentile=apy.filter_bed_cov_hist(bed_histogram_path,p,scafNames,chrStarts,sampleNames,coverage,filter_parameter_site_per_sample['max_percentile_cov_ancient'],two_tailed=False,upper=True)
-    failed_coverage_percentile[:,~ancient_sample_bool]=False
+    failed_coverage_percentile[:,~ancient_bool]=False
     """
-    ## Removing SNP calls that are very close to nearby heterozygosity per sample (10bp default)
-    if optional_filtering['heterozygosity'] == 'All':
-        failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1)
-    elif optional_filtering['heterozygosity'] == 'Ancient':
-        failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1)
-        failed_heterozygosity[:,~ancient_sample_bool]=False
-    else: failed_heterozygosity = np.full(calls.shape, False)
-    #TODO: add union of failed covg percentile and failed genomic islands
+    failed_heterozygosity_output_path='failed_heterozygosity.txt'
+    if os.path.exists(f'{failed_heterozygosity_output_path}'):
+        failed_heterozygosity = np.read_csv(failed_heterozygosity_output_path)
+    else:
+        ## Removing SNP calls that are very close to nearby heterozygosity per sample (10bp default)
+        if optional_filtering['heterozygosity'] == 'All':
+            failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1)
+        elif optional_filtering['heterozygosity'] == 'Ancient':
+            failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1)
+            failed_heterozygosity[:,~ancient_bool]=False
+        else: failed_heterozygosity = np.full(calls.shape, False)
+        np.savetxt(f'{failed_heterozygosity_output_path}',failed_heterozygosity)
+        #TODO: add union of failed covg percentile and failed genomic islands
+        # failed_heterozygosity = (failed_genomic_islands | failed_coverage_percentile | failed_heterozygosity)
     return failed_heterozygosity
 
 def identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index_for_identites,indel_identities):
@@ -128,16 +133,24 @@ def identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index
     return goodpos_indels,candidate_indels,indel_sizes_called
 
 def site_filter_check(calls,optional_filtering,failed_recombinants,minorAF):
-    failed_optional_siteFilt = np.full(calls.shape, False)
-    if optional_filtering['recombination'] != 'None':
-        failed_optional_siteFilt[failed_recombinants ,:] = 4
-    if optional_filtering['minoraf_covariance']:
-        cov_scores=[]
-        for x in minorAF:
-            cov_scores.append(np.cov(x))
-        minorAF_covariance_failed=np.where(np.array(cov_scores) > np.percentile(np.array(cov_scores),optional_filtering['minoraf_covariance']))[0]
-        failed_optional_siteFilt[minorAF_covariance_failed,:]=4
+    failed_site_filter_output_path='failed_site_filt.txt'
+    if os.path.exists(f'{failed_site_filter_output_path}'):
+        failed_optional_siteFilt = np.read_csv(failed_site_filter_output_path)
+    else:
+        failed_optional_siteFilt = np.full(calls.shape, False)
+        if optional_filtering['recombination'] != 'None':
+            failed_optional_siteFilt[failed_recombinants ,:] = 4
+        if optional_filtering['minoraf_covariance']:
+            cov_scores=[]
+            for x in minorAF:
+                cov_scores.append(np.cov(x))
+            minorAF_covariance_failed=np.where(np.array(cov_scores) > np.percentile(np.array(cov_scores),optional_filtering['minoraf_covariance']))[0]
+            failed_optional_siteFilt[minorAF_covariance_failed,:]=4
+        np.savetxt(f'{failed_site_filter_output_path}',failed_optional_siteFilt)
     return failed_optional_siteFilt
+
+def blast_masking():
+    pass
 
 def generate_fasta(goodpos_final2useTree,calls,sampleNames,refnt,refgenome,analysis_params_output_name,name_append=''):
     # get data and filter for goodpos_final
@@ -231,22 +244,37 @@ def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage
     print('Checking parsing for goodpos_final_cleaned_cmt - - - - PARSING OK?:',np.all(np.array(range(len(goodpos_final))) == goodpos_final_cleaned_cmt_loaded))
     print('Checking parsing for analysis_params_output_name - - - PARSING OK?:', analysis_params_output_name == analysis_params_output_name_loaded)
 
-def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
-    # run full QC script
-    os.chdir(f'{input_output_dir}')
+def validate_json(pared_json):
+    if not os.path.exists(f'{pared_json}'):
+        print(f'Path for parameter json file not found: {pared_json}')
+        print(f'Please ensure the input path exists')
+        raise FileNotFoundError
 
-    ref_genome_folder=ref_genome_dir
+def main(parameter_json):
     with open(f'{parameter_json}') as f_in:
-        filtering_dicts=json.load(f_in)
-    analysis_params_output_name=parameter_json.split('/')[-1].strip('.json')[0]
+        json_parsed=json.load(f_in)
+
+    # validate all paths, etc, error if anything missing and return useful info to end user
+    validate_json(json_parsed)
+
+    # setup I/O
+    analysis_params_output_name=json_parsed['input_output']['runtime_name']
+
+    input_output_dir=json_parsed['input_output']['input_directory']
+    
+    os.makedirs(f'{input_output_dir}/{analysis_params_output_name}',exist_ok=True)
+    os.chdir(f'{input_output_dir}/{analysis_params_output_name}')
+
+    ref_genome_dir=json_parsed['input_output']['ref_directory']
 
     # Filtering parameters
     # =============================================================================
+    filtering_dicts=json_parsed['filtering']
 
     # Much of this will need to vary according to your reference genome,
     # coverage, and particular samples
-    # consider to add SD filter in addition to coverage. Isolates of other species that harbor plasmid present in pangenome at very high cov can otherwise meet the coverage threshold even though FP
-    
+    # adjust within json!
+
     filter_parameter_sample_across_sites = filtering_dicts['filter_parameter_sample_across_sites']
 
     filter_parameter_site_per_sample = filtering_dicts['filter_parameter_site_per_sample']
@@ -260,6 +288,7 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     ######################################################
     ### SETUP DONE ###### SETUP DONE ###### SETUP DONE ###
     ######################################################
+    # run full QC script
 
     ######################################################
     ## START PROCESSING DATA #### START PROCESSING DATA ##
@@ -267,12 +296,12 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     # 
     # Read in genome information
     # =============================================================================
-    [chrStarts, genomeLength, scafNames] = apy.genomestats(ref_genome_folder)
+    [chrStarts, genomeLength, scafNames] = apy.genomestats(ref_genome_dir)
     refgenome=ref_genome_dir.split('/')[-1]
 
     # Load data from candidate_mutation_
     # =============================================================================
-    [quals,p,counts,in_outgroup,sampleNames,indel_counter,coverage_stats,indel_p,indel_depth,indel_support,indel_identities,indel_index_for_identites] = apy.read_candidate_mutation_table_pickle_gzip('candidate_mutation_table.pickle.gz')
+    [quals,p,counts,in_outgroup,sampleNames,indel_counter,coverage_stats,indel_p,indel_depth,indel_support,indel_identities,indel_index_for_identites] = apy.read_candidate_mutation_table_pickle_gzip(f'{input_output_dir}/candidate_mutation_table.pickle.gz')
 
     # 
     # Mean cov per samples based on all positions in counts (aka p)
@@ -284,9 +313,7 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     median_cov_p_per_sample = np.vstack( (np.array(['sample','median_p_cov']),np.column_stack( (sampleNames,np.median( np.sum(counts,axis=1),axis=1)) )) )    
     np.savetxt('./median_cov_per_sample.csv', median_cov_p_per_sample, delimiter=',',fmt='%s')
 
-
-
-    # 
+    # =============================================================================
     # convert outputs to more permanent datatypes
     # =============================================================================
 
@@ -309,16 +336,34 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     # Display samples the NOT fullfill min_average_coverage_to_include_sample:
     # =============================================================================
     #
+    # ID samples of outgroup/ingroup 
+    if len(json_parsed['sample_labelling']['outgroup_name']) > 0:
+        outgroup_sample = json_parsed['sample_labelling']['outgroup_name']
+        outgroup_bool = np.isin(sampleNames,[f'{outgroup_sample}'])
+    elif len(json_parsed['sample_labelling']['outgroup_pattern']) > 0:
+        outgroup_pattern = re.compile(fr'{json_parsed['sample_labelling']['outgroup_pattern']}')
+        outgroup_bool = np.isin(sampleNames,list(filter(outgroup_pattern.match, sampleNames)))
+    else:
+        outgroup_bool=np.zero(len(sampleNames)).astype(bool)
 
-    ancient_sample_names_patterns = re.compile(r'^SP\.*|^M219')
-    ancient_sample_names = list(filter(ancient_sample_names_patterns.match, sampleNames))
+    # ID ancient samples
+    if len(json_parsed['sample_labelling']['ancient_name']) > 0:
+        ancient_sample = json_parsed['sample_labelling']['ancient_name']
+        ancient_bool = np.isin(sampleNames,[f'{ancient_sample}'])
+    elif len(json_parsed['sample_labelling']['ancient_pattern']) > 0:
+        ancient_pattern = re.compile(fr'{json_parsed['sample_labelling']['ancient_pattern']}')
+        ancient_bool = np.isin(sampleNames,list(filter(ancient_pattern.match, sampleNames)))
+    else:
+        ancient_bool=np.zero(len(sampleNames)).astype(bool)
+
+
+    # =============================================================================
+    # Define goodsamples and filter data, good samples have > avg coverage
+    # =============================================================================
 
     lowcovsamples = sampleNames_all[ np.mean(coverage_all, axis=0) < filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'] ]
     print("The following samples will be excluded:", lowcovsamples)
 
-    # 
-    # Define goodsamples and filter data, good samples have > avg coverage
-    # =============================================================================
     goodsamples =  np.all([coverage_all.mean(axis=0) >= filter_parameter_sample_across_sites['min_average_coverage_to_include_sample']],axis=0)
 
     #Breakpoint: Too few samples passed filter, checking that at least 2 samples pass QC
@@ -330,6 +375,18 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     quals = quals_all[ : , goodsamples ]
     coverage = coverage_all[ : ,goodsamples]
     indels = indel_counter[:,goodsamples]
+    outgroup_bool = outgroup_bool[goodsamples]
+    ancient_bool = ancient_bool[goodsamples]
+
+
+    ## TODO: update how this is done
+    # TODO: CAN ALSO JUST GRAB OUTGROUP BY OUTPUTTING THE SAMPLES CSV from case
+    outgroup_idx=np.nonzero(outgroup_bool)[0]
+
+    # ingroup array (bool, idx) used later
+    ingroup_bool = np.invert(outgroup_bool)
+    ingroup_idx = np.nonzero(ingroup_bool)[0]
+
 
     indel_depth=indel_depth_all[:,goodsamples,:]
     indel_support=indel_support_all[:,goodsamples]
@@ -341,43 +398,23 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     coverage_forward_strand = counts[:,0:4,:].sum(axis=1).transpose()
     coverage_reverse_strand = counts[:,4:8,:].sum(axis=1).transpose()
 
-    ancient_sample_bool = np.in1d(sampleNames,ancient_sample_names)
     indel_support[:,outgroup_idx]=np.nan
-    indel_sizes_called[:,outgroup_idx]=np.nan
+    #indel_sizes_called[:,outgroup_idx]=np.nan
 
-    goodpos_indels,candidate_indels,indel_sizes_called=identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index_for_identites,indel_identities)
+    #goodpos_indels,candidate_indels,indel_sizes_called=identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index_for_identites,indel_identities)
     
-    # 
+    # =============================================================================
     # Extract refnt and define out/in-group bools
     # =============================================================================
 
     ## Note ancnti/outs_nti defined below after filtered calls has been generated!
     ## get reference allele for all p; NOTE: analysis.m stored ATCG as double-digit-numeric
     # use ref nt for mutation calls. important if multiple outgroups called 
-    refnt = apy.extract_outgroup_mutation_positions(ref_genome_folder, apy.p2chrpos(p,chrStarts));
+    refnt = apy.extract_outgroup_mutation_positions(ref_genome_dir, apy.p2chrpos(p,chrStarts));
     refnti = apy.nts2idx(refnt)
     refnti_m = np.tile(refnti,(num_samples,1)).transpose() # build 2D matrix with outgroup (ancestral) allele
-    # print(np.unique(refnt)) # sanity check
 
-    # When no outgroup defined: refnt ~= ancnt:
-    #ancnt = refnt   
 
-    ## Estimate outgroup (ancestral allele) from ALL samples added as outgroup to SM pipeline (ancnti* == major allele)
-    ##  NOTE: NOTE: NOTE:
-
-    ## TODO: update how this is done
-    ##  NOTE: 
-    # CAN ALSO JUST GRAB OUTGROUP BY OUTPUTTING THE SAMPLES CSV from case
-    outgroup_bool = np.isin(sampleNames,['YAC'])
-    outgroup_name = sampleNames[outgroup_bool]
-    outgroup_idx=np.nonzero(outgroup_bool)[0]
-
-    # ingroup array (bool, idx) used later
-    ingroup_bool = np.invert(outgroup_bool)
-    ingroup_idx = np.nonzero(ingroup_bool)[0]
-
-    ## get subsets of LNBA branch (clades) to find mutations
-    #likely inputs
 
     # Find positions with fixed mutations
     # 
@@ -395,9 +432,7 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     #  Make some basic structures for finding mutations
     mutantAF = np.zeros(maNT.shape)
     mutantAF[maNT != refnti_m] = maf[ maNT != refnti_m]; 
-    ## generate mutantAF --> all positions that are not the reference, fetch major allele frequency, if reference at this pos, put zero
 
-    # mutantAF[ (minorNT != refnti_m) & (minorNT != 4) ] = mutantAF[  (minorNT != refnti_m) & (minorNT != 4)] + minorAF[  (minorNT != refnti_m) & (minorNT != 4) ] #this construction allows for positions with two different non-ancestral-mutations (when analysing data of more than one colony...plate sweeps)   
 
     # Define mutations we do not trust in each and across samples.
     # goodpos are indices of p that we trust
@@ -413,11 +448,7 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     print("Number of variants after this filtering step: ", intermediate_num_variants)
     print("Number of variants removed: ", variants_removed_failed_within_sample)
 
-
-
-    # TODO: implement
-    # failed_metagenomic=(failed_genomic_islands | failed_coverage_percentile | failed_heterozygosity)
-    failed_metagenomic=metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_sample_bool)
+    failed_metagenomic=metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool)
     calls[(failed_metagenomic | failed_within_sample)]=4
 
     intermediate_hasmutation_post_sample_checks_and_metagenomics=(calls != refnti_m) & (calls < 4)
@@ -444,7 +475,7 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     ## Remove putative recombinants
     failed_any_QC = ( failed_metagenomic | failed_within_sample)
 
-    failed_recombinants=recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_sample_bool,filter_parameter_site_across_samples,failed_any_QC)
+    failed_recombinants=recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC)
 
 
     ## Filter per site across samples
@@ -477,15 +508,14 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
     goodpos = candpos
     print(goodpos.size,'goodpos found.')
 
-    if write_fasta:
+    if json_parsed['input_output']['save_fasta']:
         generate_fasta(goodpos,calls,sampleNames,ingroup_bool,refnt,refgenome,analysis_params_output_name,name_append='')
 
 
-    """
-    #TODO: implement
-    if run_blast_masking:
+
+    if optional_filtering['run_blast_masking']:
         blast_masking()
-    """
+
 
     save_qc_filtered(goodpos,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name)
 
@@ -536,13 +566,9 @@ def main(input_output_dir,ref_genome_dir,write_fasta,parameter_json):
 ## execute 
 
 args = parser.parse_args()
-print(args.filename, args.count, args.verbose)
-
-main(args.input_directory,args.reference_directory,args.write_fasta)
+main(args.parameter_json)
 
 """
-def blast_masking():
-    # TODO: adjust and run optional argument (ideally completely within python?)
 # LOAD BACK IN RESULTS
 def reparse_singleton_mpileup_calls_to_reads(blast_result_file):
     # TODO: move to apy
