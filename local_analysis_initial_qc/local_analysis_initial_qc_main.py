@@ -38,9 +38,9 @@ parser.add_argument('-p', '--parameter_json',
 def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample):
     # Witin sample checks
     ## Filter per mutation
-    failed_within_sample_output_path=f'failed_within_sample.txt'
+    failed_within_sample_output_path=f'failed_within_sample.npz'
     if os.path.exists(f'{failed_within_sample_output_path}'):
-        failed_within_sample = np.read_csv(f'{failed_within_sample_output_path}')
+        failed_within_sample = np.load(f'{failed_within_sample_output_path}')['arr_0']
     else:
         failed_quals = (quals < filter_parameter_site_per_sample['min_qual_for_call'])
         failed_maf=(maf < filter_parameter_site_per_sample['min_maf_for_call'])
@@ -51,13 +51,13 @@ def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_stra
 
         # summarize and output
         failed_within_sample = (failed_quals | failed_maf | failed_forward | failed_reverse | failed_cov | failed_indels)
-        np.savetxt(f'{failed_within_sample_output_path}',failed_within_sample)
+        np.savez_compressed(f'{failed_within_sample_output_path}',failed_within_sample)
     return failed_within_sample
 
 def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC):
-    failed_recombinant_output_path=f'failed_recombinant.txt'
+    failed_recombinant_output_path=f'failed_recombinant.npz'
     if os.path.exists(f'{failed_recombinant_output_path}'):
-        failed_recombinants = np.read_csv(f'{failed_recombinant_output_path}')
+        failed_recombinants = np.load(f'{failed_recombinant_output_path}')['arr_0']
     else:
         recombination_distance=filter_parameter_site_across_samples['distance_threshold_recombination']
         recombination_correlation=filter_parameter_site_across_samples['correlation_threshold_recombination']
@@ -65,7 +65,7 @@ def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,fi
             failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ancient_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ancient_bool ] )[1]
         elif optional_filtering['recombination'] == 'All':
             failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ingroup_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ingroup_bool ] )[1]
-        np.savetxt(f'{failed_recombinant_output_path}',failed_recombinants)
+        np.savez_compressed(f'{failed_recombinant_output_path}',failed_recombinants)
     return failed_recombinants
 
 def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
@@ -85,7 +85,7 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
     """
     failed_heterozygosity_output_path='failed_heterozygosity.txt'
     if os.path.exists(f'{failed_heterozygosity_output_path}'):
-        failed_heterozygosity = np.read_csv(failed_heterozygosity_output_path)
+        failed_heterozygosity = np.load(failed_heterozygosity_output_path)['arr_0']
     else:
         ## Removing SNP calls that are very close to nearby heterozygosity per sample (10bp default)
         if optional_filtering['heterozygosity'] == 'All':
@@ -94,7 +94,7 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
             failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1)
             failed_heterozygosity[:,~ancient_bool]=False
         else: failed_heterozygosity = np.full(calls.shape, False)
-        np.savetxt(f'{failed_heterozygosity_output_path}',failed_heterozygosity)
+        np.savez_compressed(f'{failed_heterozygosity_output_path}',failed_heterozygosity)
         #TODO: add union of failed covg percentile and failed genomic islands
         # failed_heterozygosity = (failed_genomic_islands | failed_coverage_percentile | failed_heterozygosity)
     return failed_heterozygosity
@@ -133,9 +133,9 @@ def identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index
     return goodpos_indels,candidate_indels,indel_sizes_called
 
 def site_filter_check(calls,optional_filtering,failed_recombinants,minorAF):
-    failed_site_filter_output_path='failed_site_filt.txt'
+    failed_site_filter_output_path='failed_site_filt.npz'
     if os.path.exists(f'{failed_site_filter_output_path}'):
-        failed_optional_siteFilt = np.read_csv(failed_site_filter_output_path)
+        failed_optional_siteFilt = np.read_csv(failed_site_filter_output_path)['arr_0']
     else:
         failed_optional_siteFilt = np.full(calls.shape, False)
         if optional_filtering['recombination'] != 'None':
@@ -146,7 +146,7 @@ def site_filter_check(calls,optional_filtering,failed_recombinants,minorAF):
                 cov_scores.append(np.cov(x))
             minorAF_covariance_failed=np.where(np.array(cov_scores) > np.percentile(np.array(cov_scores),optional_filtering['minoraf_covariance']))[0]
             failed_optional_siteFilt[minorAF_covariance_failed,:]=4
-        np.savetxt(f'{failed_site_filter_output_path}',failed_optional_siteFilt)
+        np.savez_compressed(f'{failed_site_filter_output_path}',failed_optional_siteFilt)
     return failed_optional_siteFilt
 
 def blast_masking():
