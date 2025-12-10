@@ -141,7 +141,7 @@ call_snakemake() {
     --keep-going \
     --use-conda \
     --conda-prefix /nexus/posix0/MPIIB-keylab/snakemake_conda_envs/ \
-    --group-components make_link_group=100000 var2pos=200 
+    --group-components make_link_group=100000 var2pos=200 pre_cand_mut_table=5
 }
 
 if [[ $onlyposteager == true ]]
