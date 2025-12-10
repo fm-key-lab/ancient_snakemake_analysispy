@@ -439,16 +439,15 @@ def findrecombinantSNPs(p, mutantAF, distance_for_nonsnp, corr_threshold_recombi
         return nonsnp_idx,np.zeros(p.shape)
     # iterate over range to ID highly correlated SNPs
     for range_start,range_end in ranges_to_search:
-        region = p[range_start:range_end+1]
-        r = mutantAF[region,:]
+        r = mutantAF[[range_start,range_end+1],:]
         if len(call_matrix_failing_qc) > 0:
-            calls_masked_any_sample=(np.sum(call_matrix_failing_qc[region,:],axis=0)>0)
+            calls_masked_any_sample=(np.sum(call_matrix_failing_qc[[range_start,range_end+1],:],axis=0)>0)
             r_only_unmasked_samples=r[:,~calls_masked_any_sample]
             corrmatrix = np.corrcoef(r_only_unmasked_samples)
         else:
             corrmatrix = np.corrcoef(r)
         [a,b]=np.where(corrmatrix > corr_threshold_recombination)
-        nonsnp_idx=np.concatenate((nonsnp_idx,region[a[np.where(a!=b)]]))
+        nonsnp_idx=np.concatenate((nonsnp_idx,np.arange(range_start,range_end+1)[a[np.where(a!=b)]]))
     nonsnp_idx=np.unique(nonsnp_idx)
     ## print number of sites which have indication for recombination
     print('\n' + str(nonsnp_idx.shape[0]) + ' of a total ' + str(p.shape[0]) + ' ('  + str((len(nonsnp_idx)/len(p))*100) + '%) positions in goodpos were found to be recombinant.')
@@ -565,12 +564,10 @@ def find_calls_near_heterozygous_sites(p, minorAF, distance_to_check, heterozygo
     site_samples_to_mask = np.full(minorAF.shape,False)
     ranges_to_search=create_ranges(p,distance_to_check)
     for range_start,range_end in ranges_to_search:
-        region = p[range_start:range_end+1]
-        if len(region)>1: 
-            r = minorAF[region,:]
-            for sample_index in indices_of_ancient_samples:
-                if np.any(r[:,sample_index]>heterozygosity_threshold):
-                    site_samples_to_mask[region,sample_index]=True
+        r = minorAF[[range_start,range_end+1],:]
+        for sample_index in indices_of_ancient_samples:
+            if np.any(r[:,sample_index]>heterozygosity_threshold):
+                site_samples_to_mask[[range_start,range_end+1],sample_index]=True
     return site_samples_to_mask
 
 ###################################################################################################
