@@ -85,7 +85,7 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
     failed_coverage_percentile=apy.filter_bed_cov_hist(bed_histogram_path,p,scafNames,chrStarts,sampleNames,coverage,filter_parameter_site_per_sample['max_percentile_cov_ancient'],two_tailed=False,upper=True)
     failed_coverage_percentile[:,~ancient_bool]=False
     """
-    failed_metagenomic_output_path='failed_heterozygosity.txt'
+    failed_metagenomic_output_path='failed_metagenomic.npz'
     if os.path.exists(f'{failed_metagenomic_output_path}'):
         print(f'metagenomic_check: existing output file for this check! loading {failed_metagenomic_output_path}')
         failed_metagenomic = np.load(failed_metagenomic_output_path)['arr_0']
