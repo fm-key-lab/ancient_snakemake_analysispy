@@ -40,6 +40,7 @@ def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_stra
     ## Filter per mutation
     failed_within_sample_output_path=f'failed_within_sample.npz'
     if os.path.exists(f'{failed_within_sample_output_path}'):
+        print(f'within_sample_checks: existing output file for this check! loading {failed_within_sample_output_path}')
         failed_within_sample = np.load(f'{failed_within_sample_output_path}')['arr_0']
     else:
         failed_quals = (quals < filter_parameter_site_per_sample['min_qual_for_call'])
@@ -57,6 +58,7 @@ def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_stra
 def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC):
     failed_recombinant_output_path=f'failed_recombinant.npz'
     if os.path.exists(f'{failed_recombinant_output_path}'):
+        print(f'recombinant_check: existing output file for this check! loading {failed_recombinant_output_path}')
         failed_recombinants = np.load(f'{failed_recombinant_output_path}')['arr_0']
     else:
         recombination_distance=filter_parameter_site_across_samples['distance_threshold_recombination']
@@ -83,9 +85,10 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
     failed_coverage_percentile=apy.filter_bed_cov_hist(bed_histogram_path,p,scafNames,chrStarts,sampleNames,coverage,filter_parameter_site_per_sample['max_percentile_cov_ancient'],two_tailed=False,upper=True)
     failed_coverage_percentile[:,~ancient_bool]=False
     """
-    failed_heterozygosity_output_path='failed_heterozygosity.txt'
-    if os.path.exists(f'{failed_heterozygosity_output_path}'):
-        failed_heterozygosity = np.load(failed_heterozygosity_output_path)['arr_0']
+    failed_metagenomic_output_path='failed_heterozygosity.txt'
+    if os.path.exists(f'{failed_metagenomic_output_path}'):
+        print(f'metagenomic_check: existing output file for this check! loading {failed_metagenomic_output_path}')
+        failed_metagenomic = np.load(failed_metagenomic_output_path)['arr_0']
     else:
         ## Removing SNP calls that are very close to nearby heterozygosity per sample (10bp default)
         if optional_filtering['heterozygosity'] == 'All':
@@ -93,11 +96,13 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
         elif optional_filtering['heterozygosity'] == 'Ancient':
             failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1)
             failed_heterozygosity[:,~ancient_bool]=False
-        else: failed_heterozygosity = np.full(calls.shape, False)
-        np.savez_compressed(f'{failed_heterozygosity_output_path}',failed_heterozygosity)
+        else: 
+            failed_heterozygosity = np.full(calls.shape, False)
+        failed_metagenomic = failed_heterozygosity
+        np.savez_compressed(f'{failed_metagenomic_output_path}',failed_metagenomic)
         #TODO: add union of failed covg percentile and failed genomic islands
         # failed_heterozygosity = (failed_genomic_islands | failed_coverage_percentile | failed_heterozygosity)
-    return failed_heterozygosity
+    return failed_metagenomic
 
 def identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index_for_identites,indel_identities):
     # apply filtering parameters on indels
@@ -135,7 +140,8 @@ def identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index
 def site_filter_check(calls,optional_filtering,failed_recombinants,minorAF):
     failed_site_filter_output_path='failed_site_filt.npz'
     if os.path.exists(f'{failed_site_filter_output_path}'):
-        failed_optional_siteFilt = np.read_csv(failed_site_filter_output_path)['arr_0']
+        print(f'site_filter_check: existing file exists! loading {failed_site_filter_output_path}')
+        failed_optional_siteFilt = np.load(failed_site_filter_output_path)['arr_0']
     else:
         failed_optional_siteFilt = np.full(calls.shape, False)
         if optional_filtering['recombination'] != 'None':
@@ -167,7 +173,6 @@ def generate_fasta(goodpos_final2useTree,calls,sampleNames,refnt,refgenome,analy
     calls_for_tree_ref_outgroup = np.concatenate((apy.idx2nts(refgenome_nts_for_tree[:, None]),calls_for_tree),axis=1)
 
     treesampleNamesLong_ref_outgroup = np.append([f'{refgenome}'],treesampleNamesLong)
-
     apy.write_calls_sampleName_to_fasta(calls_for_tree_ref_outgroup,treesampleNamesLong_ref_outgroup,f'{analysis_params_output_name}{name_append}')
 
 def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name):
@@ -499,8 +504,7 @@ def main(parameter_json):
     print(goodpos.size,'goodpos found.')
 
     if json_parsed['input_output']['save_fasta']:
-        generate_fasta(goodpos,calls,sampleNames,ingroup_bool,refnt,refgenome,analysis_params_output_name,name_append='')
-
+        generate_fasta(goodpos,calls,sampleNames,refnt,refgenome,analysis_params_output_name,name_append='')
 
 
     if optional_filtering['run_blast_masking']:
