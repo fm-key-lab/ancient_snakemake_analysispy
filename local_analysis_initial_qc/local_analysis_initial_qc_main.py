@@ -35,7 +35,8 @@ parser.add_argument('-p', '--parameter_json',
 
 # helper functions
 
-def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample):
+#TODO: add median coverage filter
+def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample,optional_within_sample_checks=[]):
     # Witin sample checks
     ## Filter per mutation
     failed_within_sample_output_path=f'failed_within_sample.npz'
@@ -49,7 +50,6 @@ def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_stra
         failed_reverse=(coverage_reverse_strand < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
         failed_cov=(coverage_reverse_strand + coverage_forward_strand < filter_parameter_site_per_sample['min_cov_on_pos'])
         failed_indels=(indels > (0.5*coverage) )
-
         # summarize and output
         failed_within_sample = (failed_quals | failed_maf | failed_forward | failed_reverse | failed_cov | failed_indels)
         np.savez_compressed(f'{failed_within_sample_output_path}',failed_within_sample)
@@ -67,6 +67,8 @@ def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,fi
             failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ancient_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ancient_bool ] )[1]
         elif optional_filtering['recombination'] == 'All':
             failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ingroup_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ingroup_bool ] )[1]
+        else:
+            failed_recombinants=np.zeros(p.shape)
         np.savez_compressed(f'{failed_recombinant_output_path}',failed_recombinants)
     return failed_recombinants
 
@@ -177,9 +179,9 @@ def generate_fasta(goodpos_final2useTree,calls,sampleNames,refnt,refgenome,analy
 
 def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name):
     # output fully reduced and filtered CMT
-    cmtFile_sub_gp = 'candidate_mutation_table_processed_gp.pickle.gz'
+    cmtFile_sub_gp = f'final_cmts/{analysis_params_output_name}_{cmtFile_sub_gp}'
     os.makedirs('final_cmts', exist_ok=True)
-    with gzip.open(f'final_cmts/{analysis_params_output_name}_{cmtFile_sub_gp}', 'wb') as pickle_file:
+    with gzip.open(cmtFile_sub_gp, 'wb') as pickle_file:
         pickle.dump({
             'counts': counts[:, :, goodpos_final],
             'quals': quals[goodpos_final, :],
@@ -204,9 +206,9 @@ def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage
             }, pickle_file)
 
     # quickly test that dumping worked correctly:
-    with gzip.open('final_cmt/' + cmtFile_sub_gp, 'rb') as pickle_file:
+    with gzip.open(cmtFile_sub_gp, 'rb') as pickle_file:
         pickle_dictionary = pickle.load(pickle_file)
-        counts_loaded = pickle_dictionary['counts' ]
+        counts_loaded = pickle_dictionary['counts']
         quals_loaded = pickle_dictionary['quals' ]
         coverage_forward_strand_loaded = pickle_dictionary['coverage_forward_strand' ]
         coverage_reverse_strand_loaded = pickle_dictionary['coverage_reverse_strand' ]
@@ -359,7 +361,7 @@ def main(parameter_json):
     lowcovsamples = sampleNames_all[ np.mean(coverage_all, axis=0) < filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'] ]
     print("The following samples will be excluded:", lowcovsamples)
 
-    goodsamples =  np.all([coverage_all.mean(axis=0) >= filter_parameter_sample_across_sites['min_average_coverage_to_include_sample']],axis=0)
+    goodsamples =  np.all([coverage_all.mean(axis=0) >= filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'],np.median( np.sum(counts,axis=1),axis=1)>filter_parameter_sample_across_sites['min_median_coverage_to_include_sample']],axis=0)
 
     #Breakpoint: Too few samples passed filter, checking that at least 2 samples pass QC
     if np.sum(goodsamples) < 2:

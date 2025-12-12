@@ -12,7 +12,8 @@
     },
     "filtering": {
         "filter_parameter_sample_across_sites": {
-            "min_average_coverage_to_include_sample": 2
+            "min_average_coverage_to_include_sample": 2,
+            "min_median_coverage_to_include_sample":0
         },
         "filter_parameter_site_per_sample": {
             "min_maf_for_call": 0.9,
