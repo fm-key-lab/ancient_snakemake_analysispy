@@ -65,8 +65,6 @@ def genomestats(REFGENOMEFOLDER):
         ChrStarts.append(Genomelength) # chr1 starts at 0 in analysis.m
         Genomelength = Genomelength + len(record)
         ScafNames.append(record.id)
-    # close file
-    #refgenome.close() # biopy update SeqIO has no close attribute anymore.
     # turn to np.arrys!
     ChrStarts = np.asarray(ChrStarts,dtype=int)
     Genomelength = np.asarray(Genomelength,dtype=int)

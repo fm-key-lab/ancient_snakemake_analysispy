@@ -34,10 +34,24 @@ parser.add_argument('-p', '--parameter_json',
                     help='Parameters for running initial QC')
 
 # helper functions
+def summary_sample_check(coverage_all,filter_parameter_sample_across_sites):
+    # Within sample checks, across all positions
+    goodsamples_output_path=f'goodsamples.npz'
+    if os.path.exists(f'{goodsamples_output_path}'):
+        print(f'summary_sample_check: existing output file for this check! loading {goodsamples_output_path}')
+        goodsamples = np.load(f'{goodsamples_output_path}')['arr_0']
+    else:
+        failed_mean_coverage =  np.mean(coverage_all, axis=0) < filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'] 
+        failed_median_coverage =  np.median(coverage_all,axis=0) < filter_parameter_sample_across_sites['min_median_coverage_to_include_sample']
+
+        goodsamples=failed_median_coverage | failed_mean_coverage
+        np.savez_compressed(f'{goodsamples_output_path}',goodsamples)
+
+    return goodsamples
 
 #TODO: add median coverage filter
 def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample,optional_within_sample_checks=[]):
-    # Witin sample checks
+    # Witin sample checks, pos by pos
     ## Filter per mutation
     failed_within_sample_output_path=f'failed_within_sample.npz'
     if os.path.exists(f'{failed_within_sample_output_path}'):
@@ -179,7 +193,7 @@ def generate_fasta(goodpos_final2useTree,calls,sampleNames,refnt,refgenome,analy
 
 def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name):
     # output fully reduced and filtered CMT
-    cmtFile_sub_gp = f'final_cmts/{analysis_params_output_name}_{cmtFile_sub_gp}'
+    cmtFile_sub_gp = f'final_cmts/{analysis_params_output_name}_post_initialqc_candidate_mutation_table.pickle.gz'
     os.makedirs('final_cmts', exist_ok=True)
     with gzip.open(cmtFile_sub_gp, 'wb') as pickle_file:
         pickle.dump({
@@ -358,10 +372,7 @@ def main(parameter_json):
     # Define goodsamples and filter data, good samples have > avg coverage
     # =============================================================================
 
-    lowcovsamples = sampleNames_all[ np.mean(coverage_all, axis=0) < filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'] ]
-    print("The following samples will be excluded:", lowcovsamples)
-
-    goodsamples =  np.all([coverage_all.mean(axis=0) >= filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'],np.median( np.sum(counts,axis=1),axis=1)>filter_parameter_sample_across_sites['min_median_coverage_to_include_sample']],axis=0)
+    goodsamples = summary_sample_check(coverage_all,filter_parameter_sample_across_sites)
 
     #Breakpoint: Too few samples passed filter, checking that at least 2 samples pass QC
     if np.sum(goodsamples) < 2:
