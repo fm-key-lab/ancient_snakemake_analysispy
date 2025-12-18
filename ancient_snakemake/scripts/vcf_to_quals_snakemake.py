@@ -16,7 +16,7 @@ import os
 import gzip
 import math 
 import numpy as np
-from analysispy_module import genomestats
+from genome_stats import genomestats
 
 
 def round_half_up(n, decimals=0):

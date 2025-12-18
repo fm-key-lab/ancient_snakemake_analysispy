@@ -83,7 +83,7 @@ rule freebayes_indels:
   conda:
     "envs/freebayes.yaml", 
   shell:
-    " freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 36 -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;"
+    " freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 72 -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;"
     " egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;"
 
 rule mpileup2vcf_ancient:

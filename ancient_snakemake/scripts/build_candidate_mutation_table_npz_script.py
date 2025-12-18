@@ -53,6 +53,9 @@ import vcf
 from Bio import SeqIO
 import glob
 
+# shared dependency
+from genome_stats import genomestats
+
 ''' positional and optional argument parser'''
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -75,31 +78,6 @@ args = parser.parse_args()
 
 
 '''Functions'''
-
-def genomestats(REFGENOMEFOLDER):
-    # parse ref genome to extract relevant stats
-    # accepts genome.fasta or genome.fasta.gz (gzip) in refgenomefolder
-    fasta_file = glob.glob(REFGENOMEFOLDER + '/genome.fasta')
-    if len(fasta_file) != 1:
-        fasta_file_gz = glob.glob(REFGENOMEFOLDER + '/genome.fasta.gz')
-        if len(fasta_file_gz) != 1:
-            raise ValueError('Either no genome.fasta(.gz) or more than 1 genome.fasta(.gz) file found in ' + REFGENOMEFOLDER)
-        else: # genome.fasta.gz
-            refgenome = SeqIO.parse(gzip.open(fasta_file_gz[0], "rt"),'fasta')
-    else: # genome.fasta
-        refgenome = SeqIO.parse(fasta_file[0],'fasta')
-    Genomelength = 0
-    ChrStarts = []
-    ScafNames = []
-    for record in refgenome:
-        ChrStarts.append(Genomelength) # chr1 starts at 0 in analysis.m
-        Genomelength = Genomelength + len(record)
-        ScafNames.append(record.id)
-    # turn to np.arrys!
-    ChrStarts = np.asarray(ChrStarts,dtype=int)
-    Genomelength = np.asarray(Genomelength,dtype=int)
-    ScafNames = np.asarray(ScafNames,dtype=object)
-    return [ChrStarts,Genomelength,ScafNames]
 
 def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_to_outgroup_boolean_file, path_to_list_of_quals_files, path_to_list_of_diversity_files, path_to_indel_vcf, path_to_candidate_mutation_table, flag_cov_raw_sparse_matrix,flag_cov_norm_sparse_scale_matrix):
     # get refgenome info:

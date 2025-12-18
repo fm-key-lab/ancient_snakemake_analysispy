@@ -6,8 +6,7 @@ import numpy as np
 import gzip
 from scipy.stats import ttest_ind, fisher_exact,ttest_1samp
 from math import log10, floor
-from analysispy_module import genomestats
-
+from genome_stats import genomestats
 
 ## input output name parsing
 def get_input_output_names(sample_path_to_pileup,sample_path_to_diversity,sample_path_to_coverage):
