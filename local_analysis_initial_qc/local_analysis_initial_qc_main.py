@@ -41,10 +41,10 @@ def summary_sample_check(coverage_all,filter_parameter_sample_across_sites):
         print(f'summary_sample_check: existing output file for this check! loading {goodsamples_output_path}')
         goodsamples = np.load(f'{goodsamples_output_path}')['arr_0']
     else:
-        failed_mean_coverage =  np.mean(coverage_all, axis=0) < filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'] 
-        failed_median_coverage =  np.median(coverage_all,axis=0) < filter_parameter_sample_across_sites['min_median_coverage_to_include_sample']
+        passed_mean_coverage =  np.mean(coverage_all, axis=0) >= filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'] 
+        passed_median_coverage =  np.median(coverage_all,axis=0) >= filter_parameter_sample_across_sites['min_median_coverage_to_include_sample']
 
-        goodsamples=failed_median_coverage | failed_mean_coverage
+        goodsamples=passed_mean_coverage & passed_median_coverage
         np.savez_compressed(f'{goodsamples_output_path}',goodsamples)
 
     return goodsamples
@@ -453,6 +453,7 @@ def main(parameter_json):
     intermediate_hasmutation_post_sample_checks[:,outgroup_bool] = False
     intermediate_num_variants=len(np.where( np.sum(intermediate_hasmutation_post_sample_checks, axis=1) > 0 )[0])
     variants_removed_failed_within_sample=len(p)-intermediate_num_variants
+    print("Filtering step within_sample_checks")
     print("Number of variants after this filtering step: ", intermediate_num_variants)
     print("Number of variants removed: ", variants_removed_failed_within_sample)
 
@@ -464,6 +465,7 @@ def main(parameter_json):
     intermediate_num_variants=len(np.where( np.sum(intermediate_hasmutation_post_sample_checks_and_metagenomics, axis=1) > 0 )[0])
     variants_removed_failed_within_sample_failed_metagenomics=len(p)-variants_removed_failed_within_sample-intermediate_num_variants
 
+    print("Filtering step metagenomic_checks")
     print("Number of variants after this filtering step: ", intermediate_num_variants)
     print("Number of variants removed: ", variants_removed_failed_within_sample_failed_metagenomics)
 
