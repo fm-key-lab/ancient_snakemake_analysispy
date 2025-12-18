@@ -2,3 +2,4 @@
 ### Adjustments for runtime:
 1) Fill in samples.csv
 2) Adjust vcf heterozygosity cutoff (if you want to include lower minor allele freqs for heterozygosity checks), default 0.1
+3) Run (bash snakemakeslurm.sh)
