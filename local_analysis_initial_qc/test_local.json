@@ -1,0 +1,47 @@
+{
+    "input_output":{
+        "input_directory": "/home/light/local_analysis_initial_qc/Senterica_MLST/",
+        "ref_directory": "/home/light/local_analysis_initial_qc/Senterica_MLST/",
+        "runtime_name": "initial_defaults",
+        "save_fasta":true
+    },
+    "sample_labelling":{
+        "comment":"Please note: double escape character (\\\\) necessary in ALL regex or literal use of forward slash",
+        "outgroup_pattern": "",
+        "outgroup_name": "SRR5598901"
+    },
+    "filtering": {
+        "filter_parameter_sample_across_sites": {
+            "min_average_coverage_to_include_sample": 2,
+            "min_median_coverage_to_include_sample":0
+        },
+        "filter_parameter_site_per_sample": {
+            "min_maf_for_call": 0.9,
+            "min_cov_per_strand_for_call": 1,
+            "min_qual_for_call": 30,
+            "min_cov_on_pos": 2,
+            "min_indel_gl_diff": 20,
+            "min_indel_af": 0.8,
+            "max_prop_0_covg_ancient": 0.9,
+            "max_percentile_cov_ancient": 0.95
+        },
+        "filter_parameter_site_across_samples": {
+            "max_fraction_ambiguous_samples": 0.25,
+            "min_median_coverage_position": 2,
+            "correlation_threshold_recombination": 0.98,
+            "distance_threshold_recombination": 500
+        },
+        "indel_filtering_params": {
+            "min_covg_on_pos": 3,
+            "major_allele_freq_indel_call": 0.85,
+            "min_gl_diff": 5,
+            "max_fraction_ambiguous_samples": 0.25
+        },
+        "optional_filtering": {
+            "run_blast_masking": false,
+            "heterozygosity": "Ancient",
+            "recombination": "All",
+            "minoraf_covariance": 95
+        }
+    }
+}
