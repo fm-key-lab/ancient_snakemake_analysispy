@@ -6,6 +6,7 @@ prog_version=0.1.0
 # default behavior: run all steps:
 onlycmt=false
 onlyposteager=false
+dryrun=
 
 ## functions
 
@@ -15,6 +16,7 @@ usage() {
     echo "Options:"
     echo "  -c, --cmt           Run only cmt snakemake (case)"
     echo "  -p, --posteager     Run only post eager snakemake (mapping)"
+    echo "  -d, --dryrun        Dry run of snakemake (posteager/mapping)"
     echo "  -v, --version       Show version"
     echo "  -h, --help          Show help"
     exit 1
@@ -29,6 +31,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -p|--posteager)
             onlyposteager=true
+            shift
+            ;;
+        -d|--dryrun)
+            dryrun=--dry-run
             shift
             ;;
         -v|--version)
@@ -57,6 +63,8 @@ help() { # print help, explanation for all parameters
             --posteager - Only run the posteager.Snakefile. Only without also invoking -c/--cmt
         -c
             --cmt - Only run the cmt.Snakefile, if restarting a run that failed on this section. Only without also invoking -p/--posteager
+        -d, 
+            --dryrun - Dry run of snakemake (posteager/mapping)
         -h     
             --help - Print this help message
         -v      
@@ -128,11 +136,12 @@ then
 fi
 
 call_snakemake() {
-    snakemake -p \
-    --snakefile $1 \
+  
+  snakemake -p \
+    --snakefile "$1" \
     --latency-wait 60 \
     -j 100 \
-    --cluster-config $(dirname $0)/cluster.slurm.json \
+    --cluster-config "$(dirname "$0")/cluster.slurm.json" \
     --cluster "sbatch ${SM_ARGS}" \
     --cluster-status scripts/slurm_status.py \
     --default-resources "tmpdir='/ptmp/${USER}/tmp'" \
@@ -141,18 +150,20 @@ call_snakemake() {
     --keep-going \
     --use-conda \
     --conda-prefix /nexus/posix0/MPIIB-keylab/snakemake_conda_envs/ \
-    --group-components make_link_group=100000 var2pos=200
+    --group-components make_link_group=100000 var2pos=200 \
+    "${@:2}" 
+
 }
 
 if [[ $onlyposteager == true ]]
 then
-    call_snakemake posteager.Snakefile 
+    call_snakemake posteager.Snakefile ${dryrun}
     exit 0
 fi
 
 if [[ $onlycmt == true ]]
 then
-    call_snakemake cmt.Snakefile 
+    call_snakemake cmt.Snakefile ${dryrun}
     exit 0
 fi
 

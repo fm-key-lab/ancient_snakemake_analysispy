@@ -1,6 +1,6 @@
-############################################
-# LIEBERMAN LAB SNAKEFILE FOR MAPPING STEP #
-############################################
+#############################################
+# KEYLAB ANCIENT SNAKEFILE FOR MAPPING STEP #
+#############################################
 ''' PRE-SNAKEMAKE '''
 
 import sys
@@ -80,6 +80,8 @@ rule freebayes_indels:
   output:
     vcf_indels="1-vcf/ref_{reference}_non_outgroup_indels_complex.vcf.gz",
     vcf_raw="1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",
+  resources:
+    mem_mb=200000,
   conda:
     "envs/freebayes.yaml", 
   shell:
@@ -98,7 +100,7 @@ rule mpileup2vcf_ancient:
     'pileup_and_filter', 
   params:
     vcf_raw="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
-    minMAF = minMAF.
+    minMAF = minMAF
   conda:
     "envs/samtools15_bcftools12.yaml"
   shell:

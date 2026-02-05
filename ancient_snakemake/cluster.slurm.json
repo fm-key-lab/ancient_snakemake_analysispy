@@ -26,44 +26,21 @@
         "output"         : "logs/{rule}_ref_{wildcards.reference}_%j.out_err.txt",
         "error"          : "logs/{rule}_ref_{wildcards.reference}_%j.out_err.txt",
     },
-    "mpileup2vcf" : {
-        "mem"            : 32000,
-        "mem-per-cpu"    : 32000, 
-        "time"           : "02:00:00",
+    "mpileup2vcf_ancient" : {
         "output"         : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
         "error"          : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
     },
-    "vcf2quals" : {
+    "vcf2quals_ancient" : {
         "output"         : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
         "error"          : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
     },
-    "pileup2diversity_matrix" : {
-        "mem"            : 32000,
-        "mem-per-cpu"    : 32000, 
-        "time"           : "08:00:00",
+    "pileup2diversity_matrix_ancient" : {
         "output"         : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
         "error"          : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
-    },
-    "vcf2quals_mat" : {
-        "output"         : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
-        "error"          : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
-    },
-    "pileup2diversity_matrix_mat" : {
-        "mem"            : 32000,
-        "mem-per-cpu"    : 32000,
-        "time"           : "08:00:00",
-        "output"         : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
-        "error"          : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out_err.txt",
-    },
-   "trim_and_map" : {
-        "mem"            : 8000,
-        "cpus-per-task"  : 4,
-        "time"           : "08:00:00",
-        "output"         : "logs/{rule}_%j.out_err.txt",
-        "error"          : "logs/{rule}_%j.out_err.txt",
     },
     "pileup_and_filter" : {
-        "mem"            : 8000,
+        "mem"            : 32000,
+        "mem-per-cpu"    : 32000, 
         "time"           : "08:00:00",
         "output"         : "logs/{rule}_%j.out_err.txt",
         "error"          : "logs/{rule}_%j.out_err.txt",
