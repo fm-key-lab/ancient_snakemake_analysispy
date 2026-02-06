@@ -80,13 +80,22 @@ rule freebayes_indels:
   output:
     vcf_indels="1-vcf/ref_{reference}_non_outgroup_indels_complex.vcf.gz",
     vcf_raw="1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",
+  params:
+    regions = "regions.bed",
   resources:
     mem_mb=200000,
   conda:
     "envs/freebayes.yaml", 
   shell:
-    " freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 72 -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;"
-    " egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;"
+    """
+        if [ -e {params.regions} ]; then 
+            freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 72 -t {params.regions} -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
+            egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
+        else
+            freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 72 -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
+            egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
+        fi
+    """
 
 rule mpileup2vcf_ancient:
   input:
@@ -100,16 +109,30 @@ rule mpileup2vcf_ancient:
     'pileup_and_filter', 
   params:
     vcf_raw="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
-    minMAF = minMAF
+    minMAF = minMAF,
+    regions = "regions.bed",
   conda:
-    "envs/samtools15_bcftools12.yaml"
+    "envs/samtools15_bcftools12.yaml",
   shell:
-    " samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bam} > {output.pileup} ;"
-    " samtools mpileup -q30 -t SP -d3000 -vf {input.ref} {input.bam} > {params.vcf_raw} ;"
-    " bcftools call -c -Oz -o {output.vcf_strain} {params.vcf_raw} ;"
-    " bcftools view -Oz -v snps -q {params.minMAF} {output.vcf_strain} > {output.variants} ;"
-    " tabix -p vcf {output.variants} ;"
-    " rm {params.vcf_raw}"
+    """
+        if [ -e {params.regions} ]; then 
+            echo "regions file specified, generating mutations only on regions defined in regions.bed."
+            samtools mpileup -l {params.regions} -q30 -x -s -O -d3000 -f {input.ref} {input.bam} > {output.pileup} ;
+            samtools mpileup -l {params.regions} -q30 -t SP -d3000 -vf {input.ref} {input.bam} > {params.vcf_raw} ;
+            bcftools call -c -Oz -o {output.vcf_strain} {params.vcf_raw} ;
+            bcftools view -Oz -v snps -q {params.minMAF} {output.vcf_strain} > {output.variants} ;
+            tabix -p vcf {output.variants} ;
+            rm {params.vcf_raw}
+        else 
+            echo "regions.bed file does not exist, output will be across full genome";
+            samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bam} > {output.pileup} ;
+            samtools mpileup -q30 -t SP -d3000 -vf {input.ref} {input.bam} > {params.vcf_raw} ;
+            bcftools call -c -Oz -o {output.vcf_strain} {params.vcf_raw} ;
+            bcftools view -Oz -v snps -q {params.minMAF} {output.vcf_strain} > {output.variants} ;
+            tabix -p vcf {output.variants} ;
+            rm {params.vcf_raw}
+        fi
+    """
 
 # strain.vcf ==> vcf_to_quals.m ==>.quals.npz
 rule vcf2quals_ancient:
