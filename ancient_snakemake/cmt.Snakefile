@@ -157,6 +157,8 @@ rule candidate_mutation_table:
         double_norm_sparse_cov_matrix = "4-candidate_mutation_table/{reference}/cov_norm_sparsecsr_mat.npz", ## sparse coverage matrix normalized over samples and positions 
     params:
         REF_GENOME_DIRECTORY = "/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/"
+    resources:
+        mem_mb=200000,
     group:
         "cand_mut_table_clean",
     conda:
