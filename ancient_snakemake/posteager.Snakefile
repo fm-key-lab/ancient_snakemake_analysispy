@@ -83,7 +83,7 @@ rule freebayes_indels:
   params:
     regions = "regions.bed",
   resources:
-    mem_mb=200000,
+    mem_mb=2000000,
   conda:
     "envs/freebayes.yaml", 
   shell:
