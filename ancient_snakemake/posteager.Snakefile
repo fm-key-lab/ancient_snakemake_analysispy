@@ -82,8 +82,6 @@ rule freebayes_indels:
     vcf_raw="1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",
   params:
     regions = "regions.bed",
-  resources:
-    mem_mb=2000000,
   conda:
     "envs/freebayes.yaml", 
   shell:
