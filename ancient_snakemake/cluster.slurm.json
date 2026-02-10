@@ -19,8 +19,7 @@
         "time"           : "01:00:00",
     },
     "freebayes_indels" : {
-        "mem"            : 200000,
-        "mem-per-cpu"    : 200000, 
+        "mem"            : "2000GB",
         "cpus-per-task"  : 72,
         "time"           : "24:00:00",
         "output"         : "logs/{rule}_ref_{wildcards.reference}_%j.out_err.txt",
@@ -40,7 +39,7 @@
     },
     "pileup_and_filter" : {
         "mem"            : 32000,
-        "mem-per-cpu"    : 32000, 
+        "mem-per-cpu"    : 32000,
         "time"           : "08:00:00",
         "output"         : "logs/{rule}_%j.out_err.txt",
         "error"          : "logs/{rule}_%j.out_err.txt",

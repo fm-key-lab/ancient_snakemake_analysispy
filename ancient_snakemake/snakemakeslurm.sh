@@ -136,7 +136,7 @@ then
 fi
 
 call_snakemake() {
-  
+
   snakemake -p \
     --snakefile "$1" \
     --latency-wait 60 \
@@ -151,7 +151,7 @@ call_snakemake() {
     --use-conda \
     --conda-prefix /nexus/posix0/MPIIB-keylab/snakemake_conda_envs/ \
     --group-components make_link_group=100000 var2pos=200 \
-    "${@:2}" 
+    "${@:2}"
 
 }
 
