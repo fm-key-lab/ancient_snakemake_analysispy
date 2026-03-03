@@ -10,5 +10,7 @@
 run within either an interactive session or a slurm script on logan (or raven, but logan is more appropriate IMO)
 
 `
+conda activate local_analysispy
+
 python /path/to/local_analysis_initial_qc/local_analysis_initial_qc_main.py -p test_local.json
 `

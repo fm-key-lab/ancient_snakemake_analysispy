@@ -89,7 +89,7 @@ rule freebayes_indels:
   shell:
     """
         if [ -e {params.regions} ]; then 
-            freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 72 -t {params.regions} -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
+            freebayes -t {params.regions} -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
             egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
         else
             freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 72 -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
