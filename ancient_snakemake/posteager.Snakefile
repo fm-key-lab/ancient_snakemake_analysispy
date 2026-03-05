@@ -161,17 +161,6 @@ rule pileup2diversity_matrix_ancient:
     from pileup_to_diversity_matrix_snakemake import pileup_to_div_matrix_snakemake
     pileup_to_div_matrix_snakemake(sample_path_to_pileup = input.pileup, sample_path_to_diversity =  output.file_diversity, sample_path_to_coverage = output.file_coverage, ref_genome_directory = params.refGenomeDir)
 
-rule remove_pileup_ancient:
-  input:
-    pileup = rules.mpileup2vcf_ancient.output.pileup,
-  params:
-    file_diversity = "3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz",
-    file_coverage = "3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.coverage.npz",
-  group:
-    'pileup_and_filter',
-  shell:
-    "rm {input.pileup};"
-
 rule cleanUp_ancient:
   input:
     part1 = expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input not used, only required so snakemake waits with clean up until the end
