@@ -87,13 +87,14 @@ rule freebayes_indels:
   shell:
     """
         if [ -e {params.regions} ]; then 
-            freebayes -t {params.regions} -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
+            freebayes 72 -t {params.regions} -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
             egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
         else
             freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 72 -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
             egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
         fi
     """
+
 
 rule mpileup2vcf_ancient:
   input:
@@ -160,6 +161,17 @@ rule pileup2diversity_matrix_ancient:
   run:
     from pileup_to_diversity_matrix_snakemake import pileup_to_div_matrix_snakemake
     pileup_to_div_matrix_snakemake(sample_path_to_pileup = input.pileup, sample_path_to_diversity =  output.file_diversity, sample_path_to_coverage = output.file_coverage, ref_genome_directory = params.refGenomeDir)
+
+rule remove_pileup_ancient:
+  input:
+    pileup = rules.mpileup2vcf_ancient.output.pileup,
+  params:
+    file_diversity = "3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz",
+    file_coverage = "3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.coverage.npz",
+  group:
+    'pileup_and_filter',
+  shell:
+    "rm {input.pileup};"
 
 rule cleanUp_ancient:
   input:
