@@ -34,33 +34,11 @@ current_directory = os.getcwd()
 
 rule all:
   input:
-    expand("data/{sampleID}/{sampleID}.bam",sampleID=SAMPLE_ls),
-    expand("data/{sampleID}/{sampleID}.bam.bai",sampleID=SAMPLE_ls),
     expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
     "samples_case.csv",
     "cleanUp_done.txt",
-
-rule make_data_links_ancient:
-  input:
-    sample_info_csv="data/{sampleID}/sample_info.csv",
-  output:
-    bams="data/{sampleID}/{sampleID}.bam",
-    bais="data/{sampleID}/{sampleID}.bam.bai",
-  group:
-    'make_link_group',
-  run:
-    ## create symbolic links
-    with open(input.sample_info_csv,'r') as f:
-      this_sample_info = f.readline() # only one line to read
-    this_sample_info = this_sample_info.strip('\n').split(',')
-    path = this_sample_info[0] # remember python indexing starts at 0
-    sample = this_sample_info[1]
-    providername = this_sample_info[3]
-    print(path + '\n' + sample)
-    # make links
-    makelink_ancient(path, sample, providername)
 
 rule create_freebayes_input:
   input:
@@ -70,6 +48,7 @@ rule create_freebayes_input:
   group:
     'pileup_and_filter',
   shell:
+    "touch {output.non_outgroup_bam_file}"
     "for BAM in {input.non_outgroup_bam_ls}; do echo ${{BAM}} >> {output.non_outgroup_bam_file} ; done ;"
 
 rule freebayes_indels:
@@ -86,7 +65,10 @@ rule freebayes_indels:
     "envs/freebayes.yaml", 
   shell:
     """
-        if [ -e {params.regions} ]; then 
+        if [ ! -s {input.non_outgroup_bam_list} ]; then
+            touch {output.vcf_raw}
+            touch {output.vcf_indels}
+        elif [ -e {params.regions} ]; then 
             freebayes 72 -t {params.regions} -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
             egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
         else
