@@ -16,7 +16,7 @@ def read_samplesCSV(spls):
     header_check = ['Path', 'Sample', 'Reference', 'Callindels', 'Outgroup']
     parsed_samples=pd.read_csv(spls,sep=',',header=0)
     if list(parsed_samples.columns)!=header_check:
-        raise TypeError
+        raise TypeError(f'Header incorrect, should follow format : {','.join(header_check)}')
     numpy_parsed=parsed_samples.to_numpy()
     paths,samples,references,call_indels,outgroup=numpy_parsed[:,0],numpy_parsed[:,1],numpy_parsed[:,2],numpy_parsed[:,3],numpy_parsed[:,4]
     # confirm path exists on all paths
@@ -26,7 +26,7 @@ def read_samplesCSV(spls):
             collector.append(path)
     if len(collector)>0:
         print('Paths not found for following paths', collector)
-        raise ValueError
+        raise ValueError(f'Paths not found for following paths {collector}')
     makelink_ancient(paths,samples)
     return [paths,samples,references,call_indels,outgroup] 
 
