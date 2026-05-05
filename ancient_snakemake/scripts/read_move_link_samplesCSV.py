@@ -13,7 +13,7 @@ import numpy as np
 
 
 def read_samplesCSV(spls):
-    header_check = ['Path', 'Sample', 'Reference', 'Call_Indels', 'Outgroup']
+    header_check = ['Path', 'Sample', 'Reference', 'Callindels', 'Outgroup']
     parsed_samples=pd.read_csv(spls,sep=',',header=0)
     if list(parsed_samples.columns)!=header_check:
         raise TypeError
