@@ -45,6 +45,17 @@ def makelink_ancient(paths,samples):
         subprocess.run('ln -s -T ' + bam + ' data/' + sample+ '/' + sample+'.bam || echo 0', shell=True)
         subprocess.run('ln -s -T ' + bam + '.bai' + ' data/' + sample+ '/' + sample+'.bam.bai || echo 0', shell=True)
 
+def get_bams(SAMPLE_ls, REF_Genome_ls):
+    ## note: multiple ref genomes + varied ingroup/outgroup identity might be edgecase, if a sample is ingrp for one ref, outgrp for the other
+    bams_ls = {}
+    for sampleID,refgenomes in zip(SAMPLE_ls,REF_Genome_ls):
+        for refgenome in refgenomes.split(" "):
+            if refgenome not in bams_ls:
+                bams_ls[refgenome] = [sampleID]
+            else: 
+                bams_ls[refgenome].append(sampleID)
+    return bams_ls
+
 def get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, CALLINDELS_ls, OUTGROUP_ls):
     ## note: multiple ref genomes + varied ingroup/outgroup identity might be edgecase, if a sample is ingrp for one ref, outgrp for the other
     non_outgroup_sample_ls = {}

@@ -20,6 +20,7 @@ minMAF = 0.1
 ## NOTE: samples should be deduplicated bam files
 spls = "samples.csv"
 [PATH_ls,SAMPLE_ls,REF_Genome_ls,CALLINDELS_ls,OUTGROUP_ls] = read_samplesCSV(spls)
+bams_ls = get_bams(SAMPLE_ls, REF_Genome_ls)
 ref_genome_to_non_outgroup_bams_dict = get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, CALLINDELS_ls, OUTGROUP_ls)
 [REF_Genome_ext_ls, SAMPLE_ext_ls] = parse_multi_genome_smpls(SAMPLE_ls, REF_Genome_ls)
 
@@ -77,7 +78,7 @@ rule freebayes_indels:
 
 rule mpileup2vcf_ancient:
   input:
-    bam=rules.make_data_links_ancient.output.bams,
+    bam=lambda wildcards: expand("data/{sampleID}/{sampleID}.bam",reference=wildcards.reference, sampleID=bams_ls[wildcards.reference]),
     ref="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta",
   output:
     pileup="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
