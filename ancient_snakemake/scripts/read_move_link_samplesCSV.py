@@ -16,7 +16,7 @@ def read_samplesCSV(spls):
     header_check = ['Path', 'Sample', 'Reference', 'Callindels', 'Outgroup']
     parsed_samples=pd.read_csv(spls,sep=',',header=0)
     if list(parsed_samples.columns)!=header_check:
-        raise TypeError(f'Header incorrect, should follow format : {','.join(header_check)}')
+        raise TypeError(f'Header incorrect, should follow format : {",".join(header_check)}')
     numpy_parsed=parsed_samples.to_numpy()
     paths,samples,references,call_indels,outgroup=numpy_parsed[:,0],numpy_parsed[:,1],numpy_parsed[:,2],numpy_parsed[:,3],numpy_parsed[:,4]
     # confirm path exists on all paths
@@ -25,7 +25,6 @@ def read_samplesCSV(spls):
         if not os.path.isfile(path):
             collector.append(path)
     if len(collector)>0:
-        print('Paths not found for following paths', collector)
         raise ValueError(f'Paths not found for following paths {collector}')
     makelink_ancient(paths,samples)
     return [paths,samples,references,call_indels,outgroup] 
@@ -46,10 +45,10 @@ def makelink_ancient(paths,samples):
         subprocess.run('ln -s -T ' + bam + ' data/' + sample+ '/' + sample+'.bam || echo 0', shell=True)
         subprocess.run('ln -s -T ' + bam + '.bai' + ' data/' + sample+ '/' + sample+'.bam.bai || echo 0', shell=True)
 
-def get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, outgroup_ls, call_indels):
+def get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, CALLINDELS_ls, OUTGROUP_ls):
     ## note: multiple ref genomes + varied ingroup/outgroup identity might be edgecase, if a sample is ingrp for one ref, outgrp for the other
     non_outgroup_sample_ls = {}
-    for sampleID,refgenomes,outgroup_bool,call_indels_bool in zip(SAMPLE_ls,REF_Genome_ls,outgroup_ls,call_indels):
+    for sampleID,refgenomes,outgroup_bool,call_indels_bool in zip(SAMPLE_ls,REF_Genome_ls,OUTGROUP_ls,CALLINDELS_ls):
         for refgenome in refgenomes.split(" "):
             if int(outgroup_bool) == 0 and int(call_indels_bool) == 0:
                 if refgenome not in non_outgroup_sample_ls:

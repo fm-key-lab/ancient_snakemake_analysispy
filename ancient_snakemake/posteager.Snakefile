@@ -19,12 +19,9 @@ minMAF = 0.1
 ## modified format to Path,Sample,ReferenceGenome,OutGroup 
 ## NOTE: samples should be deduplicated bam files
 spls = "samples.csv"
-[PATH_ls,SAMPLE_ls,REF_Genome_ls,PROVIDER_ls,CLADEID_ls,OUTGROUP_ls] = read_samplesCSV(spls)
-ref_genome_to_non_outgroup_bams_dict = get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, OUTGROUP_ls)
+[PATH_ls,SAMPLE_ls,REF_Genome_ls,CALLINDELS_ls,OUTGROUP_ls] = read_samplesCSV(spls)
+ref_genome_to_non_outgroup_bams_dict = get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, CALLINDELS_ls, OUTGROUP_ls)
 [REF_Genome_ext_ls, SAMPLE_ext_ls] = parse_multi_genome_smpls(SAMPLE_ls, REF_Genome_ls)
-# Write sample_info.csv for each sample
-split_samplesCSV(PATH_ls,SAMPLE_ls,REF_Genome_ls,PROVIDER_ls,CLADEID_ls)
-CLADES_ls = set(CLADEID_ls)
 
 # grab current working directory for qc rules to use
 current_directory = os.getcwd()
