@@ -45,10 +45,10 @@ rule create_freebayes_input:
   output:
     non_outgroup_bam_file="0-freebayes_input/ref_{reference}_non_outgroup_bams.txt",
   group:
-    'pileup_and_filter',
+    'freebayes_indels_group',
   shell:
     """
-    touch {output.non_outgroup_bam_file}
+    > {output.non_outgroup_bam_file}
     for BAM in {input.non_outgroup_bam_ls}
         do 
         echo ${{BAM}} >> {output.non_outgroup_bam_file}
@@ -65,6 +65,8 @@ rule freebayes_indels:
     vcf_raw="1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",
   params:
     regions = "regions.bed",
+group:
+    'freebayes_indels_group',
   conda:
     "envs/freebayes.yaml", 
   shell:
@@ -177,4 +179,3 @@ rule generate_next_samplescsv:
     """ echo 'Path,Sample,ReferenceGenome,Outgroup' > {output.case_csv} ;"""
     " dir=$(pwd) ;"
     """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$5}}' {input.csv} >> {output.case_csv} ;"""
-

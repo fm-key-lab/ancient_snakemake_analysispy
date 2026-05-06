@@ -304,4 +304,3 @@ if __name__ == "__main__":
         print('Selected to build double normalized coverage matrix. Raw coverage matrix will be build, too.')
     main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_to_outgroup_boolean_file, path_to_list_of_quals_files, path_to_list_of_diversity_files, path_to_indel_vcf, path_to_candidate_mutation_table, flag_cov_raw_sparse_matrix,flag_cov_norm_sparse_scale_matrix)
 
-

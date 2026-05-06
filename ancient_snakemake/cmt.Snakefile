@@ -56,7 +56,7 @@ rule variants2positions:
         outgroup_tag = "{outgroup}", # boolean (0==ingroup or 1==outgroup)
         maxFQ = maxFQ
     output:
-        mat_positions = "0-temp_pos/{sampleID}_ref_{reference}_outgroup{outgroup}_positions.npz",
+        temp_positions = "0-temp_pos/{sampleID}_ref_{reference}_outgroup{outgroup}_positions.npz",
     group:
         "var2pos",
     run:
