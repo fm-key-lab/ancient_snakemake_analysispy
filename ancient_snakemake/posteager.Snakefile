@@ -37,6 +37,7 @@ rule all:
     expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
     "samples_case.csv",
     "cleanUp_done.txt",
+    "samples.csv"
 
 rule create_freebayes_input:
   input:
@@ -46,8 +47,13 @@ rule create_freebayes_input:
   group:
     'pileup_and_filter',
   shell:
-    "touch {output.non_outgroup_bam_file}"
-    "for BAM in {input.non_outgroup_bam_ls}; do echo ${{BAM}} >> {output.non_outgroup_bam_file} ; done ;"
+    """
+    touch {output.non_outgroup_bam_file}
+    for BAM in {input.non_outgroup_bam_ls}
+        do 
+        echo ${{BAM}} >> {output.non_outgroup_bam_file}
+    done 
+    """
 
 rule freebayes_indels:
   input:
@@ -170,4 +176,5 @@ rule generate_next_samplescsv:
   shell: 
     """ echo 'Path,Sample,ReferenceGenome,Outgroup' > {output.case_csv} ;"""
     " dir=$(pwd) ;"
-    """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$6}}' {input.csv} >> {output.case_csv} ;"""
+    """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$5}}' {input.csv} >> {output.case_csv} ;"""
+

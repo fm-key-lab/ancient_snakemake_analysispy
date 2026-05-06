@@ -7,6 +7,7 @@ prog_version=0.1.0
 onlycmt=false
 onlyposteager=false
 dryrun=
+forceall=
 
 ## functions
 
@@ -17,6 +18,7 @@ usage() {
     echo "  -c, --cmt           Run only cmt snakemake (case)"
     echo "  -p, --posteager     Run only post eager snakemake (mapping)"
     echo "  -d, --dryrun        Dry run of snakemake (posteager/mapping)"
+    echo "  -f, --forceall      Force rerun snakemake (overwrite existing files)"
     echo "  -v, --version       Show version"
     echo "  -h, --help          Show help"
     exit 1
@@ -35,6 +37,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -d|--dryrun)
             dryrun=--dry-run
+            shift
+            ;;
+        -f|--forceall)
+            forceall=--forceall
             shift
             ;;
         -v|--version)
@@ -65,6 +71,8 @@ help() { # print help, explanation for all parameters
             --cmt - Only run the cmt.Snakefile, if restarting a run that failed on this section. Only without also invoking -p/--posteager
         -d, 
             --dryrun - Dry run of snakemake (posteager/mapping)
+        -f,
+            --forceall - Force rerun given snakemake execution
         -h     
             --help - Print this help message
         -v      
@@ -151,22 +159,22 @@ call_snakemake() {
     --use-conda \
     --conda-prefix /nexus/posix0/MPIIB-keylab/snakemake_conda_envs/ \
     --group-components make_link_group=100000 var2pos=200 \
-    "${@:2}"
-
+    "${@:2}" 
 }
 
 if [[ $onlyposteager == true ]]
 then
-    call_snakemake posteager.Snakefile ${dryrun}
+    call_snakemake posteager.Snakefile ${dryrun} ${forceall}
     exit 0
 fi
 
 if [[ $onlycmt == true ]]
 then
-    call_snakemake cmt.Snakefile ${dryrun}
+    call_snakemake cmt.Snakefile ${dryrun} ${forceall}
     exit 0
 fi
 
 # unified call (default behavior)
-call_snakemake posteager.Snakefile && call_snakemake cmt.Snakefile
+call_snakemake posteager.Snakefile ${dryrun} ${forceall} && call_snakemake cmt.Snakefile ${dryrun} ${forceall}
 exit 0
+
