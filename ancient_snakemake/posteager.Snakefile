@@ -44,8 +44,6 @@ rule freebayes_indels:
     vcf_raw="1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",
   params:
     regions = "regions.bed",
-  group:
-    'freebayes_indels_group',
   conda:
     "envs/freebayes.yaml", 
   shell:

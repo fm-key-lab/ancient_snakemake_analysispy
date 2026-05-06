@@ -1,7 +1,7 @@
 #! /bin/bash 
 ## defaults, will be overwritten if redefined in options parsing
 script_name=$(basename $0)
-prog_version=0.1.0
+prog_version=0.1.1
 
 # default behavior: run all steps:
 onlycmt=false
