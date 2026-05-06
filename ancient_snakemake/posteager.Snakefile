@@ -11,17 +11,12 @@ sys.path.insert(0, SCRIPTS_DIRECTORY)
 # from import read_samplesCSV # not needed since this function is in the next file
 from read_move_link_samplesCSV import *
 
-## Define couple of lists from samples.csv
-## Format: Path,Sample,ReferenceGenome,ProviderName,Subject
-
 minMAF = 0.1
 
-## modified format to Path,Sample,ReferenceGenome,OutGroup 
-## NOTE: samples should be deduplicated bam files
+## Format: Path,Sample,ReferenceGenome,ProviderName,Subject
 spls = "samples.csv"
 [PATH_ls,SAMPLE_ls,REF_Genome_ls,CALLINDELS_ls,OUTGROUP_ls] = read_samplesCSV(spls)
 bams_ls = get_bams(SAMPLE_ls, REF_Genome_ls)
-ref_genome_to_non_outgroup_bams_dict = get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, CALLINDELS_ls, OUTGROUP_ls)
 [REF_Genome_ext_ls, SAMPLE_ext_ls] = parse_multi_genome_smpls(SAMPLE_ls, REF_Genome_ls)
 
 # grab current working directory for qc rules to use
@@ -39,25 +34,9 @@ rule all:
     "cleanUp_done.txt",
     "samples.csv"
 
-rule create_freebayes_input:
-  input:
-    non_outgroup_bam_ls=lambda wildcards: expand("data/{sampleID}/{sampleID}.bam",reference=wildcards.reference, sampleID=ref_genome_to_non_outgroup_bams_dict[wildcards.reference]),
-  output:
-    non_outgroup_bam_file="0-freebayes_input/ref_{reference}_non_outgroup_bams.txt",
-  group:
-    'freebayes_indels_group',
-  shell:
-    """
-    > {output.non_outgroup_bam_file}
-    for BAM in {input.non_outgroup_bam_ls}
-        do 
-        echo ${{BAM}} >> {output.non_outgroup_bam_file}
-    done 
-    """
-
 rule freebayes_indels:
   input:
-    non_outgroup_bam_list=rules.create_freebayes_input.output.non_outgroup_bam_file, 
+    non_outgroup_bam_list="0-freebayes_input/ref_{reference}_non_outgroup_bams.txt", 
     fai="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta.fai",
     ref="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta",
   output:
@@ -72,8 +51,8 @@ rule freebayes_indels:
   shell:
     """
         if [ ! -s {input.non_outgroup_bam_list} ]; then
-            touch {output.vcf_raw}
-            touch {output.vcf_indels}
+            > {output.vcf_raw} ;
+            > {output.vcf_indels} ;
         elif [ -e {params.regions} ]; then 
             freebayes 72 -t {params.regions} -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
             egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
@@ -179,3 +158,4 @@ rule generate_next_samplescsv:
     """ echo 'Path,Sample,ReferenceGenome,Outgroup' > {output.case_csv} ;"""
     " dir=$(pwd) ;"
     """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$5}}' {input.csv} >> {output.case_csv} ;"""
+

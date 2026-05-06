@@ -267,21 +267,23 @@ def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_t
                     collector_index_for_identity.append(indel_index_for_identity)
                     collector_indel_identity.append(indel_identites)
                     collector_indel_pos.append(position)
+        ## convert to numpy arrays for output
+        indel_support=np.array(collector_indel_support,dtype='float')
+        indel_depth=np.array(collector_indel_depth,dtype='float')
+        indel_index_for_identity=np.array(collector_index_for_identity,dtype='float')
+        indel_identites=np.array(collector_indel_identity,dtype='object')
+        indel_p=np.array(collector_indel_pos,dtype='int')
     else: 
         print("VCF file for indels is empty, creating dummy arrays")
-        indel_support=np.array([],dtype='float')
-        indel_depth=np.array([],dtype='float')
-        indel_index_for_identity=np.array([],dtype='float')
+        depth_at_pos=np.zeros((0,2)) 
+        indel_support_at_pos=np.zeros((0))
+        indel_index_for_identity=np.zeros((0))
+        indel_support=np.array([indel_support_at_pos],dtype='float')
+        indel_depth=np.array([depth_at_pos],dtype='float')
+        indel_index_for_identity=np.array([indel_index_for_identity],dtype='float')
         indel_p=np.array([],dtype='int')
         indel_identites=np.array([],dtype='object')
 
-    ## convert to numpy arrays for output
-    
-    indel_support=np.array(collector_indel_support,dtype='float')
-    indel_depth=np.array(collector_indel_depth,dtype='float')
-    indel_index_for_identity=np.array(collector_index_for_identity,dtype='float')
-    indel_identites=np.array(collector_indel_identity,dtype='object')
-    indel_p=np.array(collector_indel_pos,dtype='int')
     ## Save cmt!   
     with gzip.open(path_to_candidate_mutation_table, 'wb') as f: 
         pickle.dump([SampleNames, p, counts, Quals, in_outgroup, indel_counter, coverage_stats,indel_p,indel_depth,indel_support,indel_identites,indel_index_for_identity], f,protocol=4) # protocol=4 for storage of files >4gb
@@ -303,4 +305,5 @@ if __name__ == "__main__":
         flag_cov_raw_sparse_matrix = True
         print('Selected to build double normalized coverage matrix. Raw coverage matrix will be build, too.')
     main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_to_outgroup_boolean_file, path_to_list_of_quals_files, path_to_list_of_diversity_files, path_to_indel_vcf, path_to_candidate_mutation_table, flag_cov_raw_sparse_matrix,flag_cov_norm_sparse_scale_matrix)
+
 

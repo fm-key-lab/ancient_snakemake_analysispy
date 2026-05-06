@@ -27,6 +27,7 @@ def read_samplesCSV(spls):
     if len(collector)>0:
         raise ValueError(f'Paths not found for following paths {collector}')
     makelink_ancient(paths,samples)
+    generate_freebayes_input(samples, references, call_indels, outgroup)
     return [paths,samples,references,call_indels,outgroup] 
 
 def parse_multi_genome_smpls(SAMPLE_ls,REF_Genome_ls):
@@ -56,14 +57,24 @@ def get_bams(SAMPLE_ls, REF_Genome_ls):
                 bams_ls[refgenome].append(sampleID)
     return bams_ls
 
-def get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, CALLINDELS_ls, OUTGROUP_ls):
+def generate_freebayes_input(SAMPLE_ls, REF_Genome_ls, CALLINDELS_ls, OUTGROUP_ls):
     ## note: multiple ref genomes + varied ingroup/outgroup identity might be edgecase, if a sample is ingrp for one ref, outgrp for the other
-    non_outgroup_sample_ls = {}
+    os.makedirs('0-freebayes_input/', exist_ok=True)
+    non_outgroup_sample_ls = {x:[] for x in np.unique(REF_Genome_ls)}
     for sampleID,refgenomes,outgroup_bool,call_indels_bool in zip(SAMPLE_ls,REF_Genome_ls,OUTGROUP_ls,CALLINDELS_ls):
         for refgenome in refgenomes.split(" "):
             if int(outgroup_bool) == 0 and int(call_indels_bool) == 0:
-                if refgenome not in non_outgroup_sample_ls:
-                    non_outgroup_sample_ls[refgenome] = [sampleID]
-                else: 
-                    non_outgroup_sample_ls[refgenome].append(sampleID)
-    return non_outgroup_sample_ls
+                non_outgroup_sample_ls[refgenome].append(sampleID)
+    # check if file exists, overwriting would restart the processing of indels
+    for refgenome in non_outgroup_sample_ls:
+        this_reference_output=f'0-freebayes_input/ref_{refgenome}_non_outgroup_bams.txt'
+        if os.path.isfile(this_reference_output):
+            with open(this_reference_output,'r') as f:
+                contents=[l.strip() for l in f.readlines()]
+            if non_outgroup_sample_ls[refgenome]==contents:
+                break
+        with open(f'0-freebayes_input/ref_{refgenome}_non_outgroup_bams.txt', "w") as f:
+            for bam in non_outgroup_sample_ls[refgenome]:
+                f.write(f"{bam}\n")
+
+

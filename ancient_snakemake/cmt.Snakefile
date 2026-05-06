@@ -60,7 +60,7 @@ rule variants2positions:
     group:
         "var2pos",
     run:
-        generate_positions_single_sample_snakemake_withoutbool(input.variants, output.mat_positions, params.maxFQ, params.REF_GENOME_DIRECTORY, params.outgroup_tag)
+        generate_positions_single_sample_snakemake_withoutbool(input.variants, output.temp_positions, params.maxFQ, params.REF_GENOME_DIRECTORY, params.outgroup_tag)
 
 
 ## combination steps are done per reference genome, double expand is therefore needed!
@@ -181,3 +181,4 @@ rule cleanUp:
         "cand_mut_table_clean",
     shell:
         " rm -rf {params.temp_folder} ; touch {output} "
+
