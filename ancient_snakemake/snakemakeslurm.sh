@@ -8,6 +8,7 @@ onlycmt=false
 onlyposteager=false
 dryrun=
 forceall=
+forceall_bool=false
 
 ## functions
 
@@ -41,6 +42,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -f|--forceall)
             forceall=--forceall
+            forceall_bool=true
             shift
             ;;
         -v|--version)
@@ -142,6 +144,9 @@ then
     chmod +x scripts/slurm_status.py;
     echo "Changed 'scripts/slurm_status.py' to executable";
 fi
+
+## If forceall, recreation of all softlinks MUST occur
+if [[ $forceall_bool == true ]]; then rm -rf data; fi
 
 call_snakemake() {
 
