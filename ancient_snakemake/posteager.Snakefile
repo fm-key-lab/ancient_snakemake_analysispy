@@ -63,7 +63,7 @@ rule freebayes_indels:
 
 rule mpileup2vcf_ancient:
   input:
-    bam=lambda wildcards: expand("data/{sampleID}/{sampleID}.bam",reference=wildcards.reference, sampleID=bams_ls[wildcards.reference]),
+    bam="data/{reference}/{sampleID}/{sampleID}.bam",
     ref="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta",
   output:
     pileup="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
@@ -74,7 +74,7 @@ rule mpileup2vcf_ancient:
   params:
     vcf_raw="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
     minMAF = minMAF,
-    regions = "regions.bed",
+    regions = "{reference}_regions.bed",
   conda:
     "envs/samtools15_bcftools12.yaml",
   shell:

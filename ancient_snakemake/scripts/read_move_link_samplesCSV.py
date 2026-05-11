@@ -26,7 +26,7 @@ def read_samplesCSV(spls):
             collector.append(path)
     if len(collector)>0:
         raise ValueError(f'Paths not found for following paths {collector}')
-    makelink_ancient(paths,samples)
+    makelink_ancient(paths,samples,references)
     generate_freebayes_input(samples, references, call_indels, outgroup)
     return [paths,samples,references,call_indels,outgroup] 
 
@@ -40,11 +40,11 @@ def parse_multi_genome_smpls(SAMPLE_ls,REF_Genome_ls):
             SAMPLE_ext_ls.append(sampleID)
     return [REF_Genome_ext_ls, SAMPLE_ext_ls]
 
-def makelink_ancient(paths,samples):
-    for bam,sample in zip(paths,samples):
+def makelink_ancient(paths,samples,references):
+    for bam,sample,reference in zip(paths,samples,references):
         os.makedirs('data/' + sample, exist_ok=True)
-        subprocess.run('ln -s -T ' + bam + ' data/' + sample+ '/' + sample+'.bam || echo 0', shell=True)
-        subprocess.run('ln -s -T ' + bam + '.bai' + ' data/' + sample+ '/' + sample+'.bam.bai || echo 0', shell=True)
+        subprocess.run(f'ln -s -T {bam} data/{reference}/{sample}/{sample}.bam || echo data/{reference}/{sample}/{sample}.bam link path already exists, skipping', shell=True)
+        subprocess.run(f'ln -s -T {bam} data/{reference}/{sample}/{sample}.bam.bai || echo data/{reference}/{sample}/{sample}.bam.bai link path already exists, skipping', shell=True)
 
 def get_bams(SAMPLE_ls, REF_Genome_ls):
     ## note: multiple ref genomes + varied ingroup/outgroup identity might be edgecase, if a sample is ingrp for one ref, outgrp for the other
