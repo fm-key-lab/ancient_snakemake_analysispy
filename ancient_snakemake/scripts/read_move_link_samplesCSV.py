@@ -42,7 +42,7 @@ def parse_multi_genome_smpls(SAMPLE_ls,REF_Genome_ls):
 
 def makelink_ancient(paths,samples,references):
     for bam,sample,reference in zip(paths,samples,references):
-        os.makedirs('data/' + sample, exist_ok=True)
+        os.makedirs(f'data/{reference}/{sample}', exist_ok=True)
         subprocess.run(f'ln -s -T {bam} data/{reference}/{sample}/{sample}.bam || echo data/{reference}/{sample}/{sample}.bam link path already exists, skipping', shell=True)
         subprocess.run(f'ln -s -T {bam} data/{reference}/{sample}/{sample}.bam.bai || echo data/{reference}/{sample}/{sample}.bam.bai link path already exists, skipping', shell=True)
 
