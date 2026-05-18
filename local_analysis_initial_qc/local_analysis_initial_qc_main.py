@@ -407,8 +407,7 @@ def main(parameter_json):
         indel_support=indel_support_all[:,goodsamples]
         indel_index_for_identites=indel_index_for_identites[:,goodsamples]
         indel_total_depth=np.nansum(indel_depth,axis=2)
-
-    indel_support[:,outgroup_idx]=np.nan
+        indel_support[:,outgroup_idx]=np.nan
     #indel_sizes_called[:,outgroup_idx]=np.nan
 
     #goodpos_indels,candidate_indels,indel_sizes_called=identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index_for_identites,indel_identities)
