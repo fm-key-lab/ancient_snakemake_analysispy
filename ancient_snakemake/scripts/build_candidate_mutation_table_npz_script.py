@@ -59,6 +59,7 @@ def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_t
     [ChrStarts,Genomelength,ScafNames]=genomestats(path_to_refgenome_dir)
 
     pwd=os.getcwd()
+    os.makedirs(,exist_ok=True)
     
     # p: positions on genome that are candidate SNPs
     print('Processing candidate SNP positions...')
@@ -167,6 +168,7 @@ def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_t
         outdir = ''
     else:
         outdir = os.path.dirname(path_to_candidate_mutation_table) + '/'
+        os.makedirs(outdir,exist_ok=True)
     if flag_cov_raw_sparse_matrix:
         all_coverage_per_bp_csr = sparse.csr_matrix(all_coverage_per_bp)
         sparse.save_npz(outdir+'cov_raw_sparsecsr_mat.npz', all_coverage_per_bp_csr,compressed=True)
