@@ -394,17 +394,19 @@ def main(parameter_json):
     # ingroup array (bool, idx) used later
     ingroup_bool = np.invert(outgroup_bool)
     ingroup_idx = np.nonzero(ingroup_bool)[0]
-
-
-    indel_depth=indel_depth_all[:,goodsamples,:]
-    indel_support=indel_support_all[:,goodsamples]
-    indel_index_for_identites=indel_index_for_identites[:,goodsamples]
-    indel_total_depth=np.nansum(indel_depth,axis=2)
-
+    
     num_samples = len(sampleNames)
 
     coverage_forward_strand = counts[:,0:4,:].sum(axis=1).transpose()
     coverage_reverse_strand = counts[:,4:8,:].sum(axis=1).transpose()
+
+
+    # check if dummy array is used:
+    if len(indel_p) > 0:
+        indel_depth=indel_depth_all[:,goodsamples,:]
+        indel_support=indel_support_all[:,goodsamples]
+        indel_index_for_identites=indel_index_for_identites[:,goodsamples]
+        indel_total_depth=np.nansum(indel_depth,axis=2)
 
     indel_support[:,outgroup_idx]=np.nan
     #indel_sizes_called[:,outgroup_idx]=np.nan
