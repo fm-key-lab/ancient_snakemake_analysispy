@@ -59,7 +59,6 @@ def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_t
     [ChrStarts,Genomelength,ScafNames]=genomestats(path_to_refgenome_dir)
 
     pwd=os.getcwd()
-    os.makedirs(,exist_ok=True)
     
     # p: positions on genome that are candidate SNPs
     print('Processing candidate SNP positions...')
