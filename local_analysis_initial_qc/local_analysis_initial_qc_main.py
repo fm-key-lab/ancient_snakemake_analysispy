@@ -32,12 +32,14 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('-p', '--parameter_json', 
                     help='Parameters for running initial QC')
+parser.add_argument('-f', '--force', default=False, action='store_true',
+                    help='Force rerun QC (overwrite and do not load previously written filtering .npz files)')
 
 # helper functions
-def summary_sample_check(coverage_all,filter_parameter_sample_across_sites):
+def summary_sample_check(coverage_all,filter_parameter_sample_across_sites,force_rerun):
     # Within sample checks, across all positions
     goodsamples_output_path=f'goodsamples.npz'
-    if os.path.exists(f'{goodsamples_output_path}'):
+    if os.path.exists(f'{goodsamples_output_path}') and not force_rerun:
         print(f'summary_sample_check: existing output file for this check! loading {goodsamples_output_path}')
         goodsamples = np.load(f'{goodsamples_output_path}')['arr_0']
     else:
@@ -50,11 +52,11 @@ def summary_sample_check(coverage_all,filter_parameter_sample_across_sites):
     return goodsamples
 
 #TODO: add median coverage filter
-def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample,optional_within_sample_checks=[]):
+def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample,force_rerun,optional_within_sample_checks=[]):
     # Witin sample checks, pos by pos
     ## Filter per mutation
     failed_within_sample_output_path=f'failed_within_sample.npz'
-    if os.path.exists(f'{failed_within_sample_output_path}'):
+    if os.path.exists(f'{failed_within_sample_output_path}') and not force_rerun:
         print(f'within_sample_checks: existing output file for this check! loading {failed_within_sample_output_path}')
         failed_within_sample = np.load(f'{failed_within_sample_output_path}')['arr_0']
     else:
@@ -69,9 +71,9 @@ def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_stra
         np.savez_compressed(f'{failed_within_sample_output_path}',failed_within_sample)
     return failed_within_sample
 
-def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC):
+def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC,force_rerun):
     failed_recombinant_output_path=f'failed_recombinant.npz'
-    if os.path.exists(f'{failed_recombinant_output_path}'):
+    if os.path.exists(f'{failed_recombinant_output_path}') and not force_rerun:
         print(f'recombinant_check: existing output file for this check! loading {failed_recombinant_output_path}')
         failed_recombinants = np.load(f'{failed_recombinant_output_path}')['arr_0']
     else:
@@ -86,7 +88,7 @@ def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,fi
         np.savez_compressed(f'{failed_recombinant_output_path}',failed_recombinants)
     return failed_recombinants
 
-def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
+def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool,force_rerun):
     """
     TODO: implement in snakemake
     # Metagenomic checks
@@ -102,7 +104,7 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool):
     failed_coverage_percentile[:,~ancient_bool]=False
     """
     failed_metagenomic_output_path='failed_metagenomic.npz'
-    if os.path.exists(f'{failed_metagenomic_output_path}'):
+    if os.path.exists(f'{failed_metagenomic_output_path}') and not force_rerun:
         print(f'metagenomic_check: existing output file for this check! loading {failed_metagenomic_output_path}')
         failed_metagenomic = np.load(failed_metagenomic_output_path)['arr_0']
     else:
@@ -153,9 +155,9 @@ def identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index
             candidate_indels.append(i)
     return goodpos_indels,candidate_indels,indel_sizes_called
 
-def site_filter_check(calls,optional_filtering,failed_recombinants,minorAF):
+def site_filter_check(calls,optional_filtering,failed_recombinants,minorAF,force_rerun):
     failed_site_filter_output_path='failed_site_filt.npz'
-    if os.path.exists(f'{failed_site_filter_output_path}'):
+    if os.path.exists(f'{failed_site_filter_output_path}') and not force_rerun:
         print(f'site_filter_check: existing file exists! loading {failed_site_filter_output_path}')
         failed_optional_siteFilt = np.load(failed_site_filter_output_path)['arr_0']
     else:
@@ -268,7 +270,7 @@ def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage
 def validate_json(pared_json):
     pass
 
-def main(parameter_json):
+def main(parameter_json,force_rerun=False):
     with open(f'{parameter_json}') as f_in:
         json_parsed=json.load(f_in)
 
@@ -279,7 +281,7 @@ def main(parameter_json):
     analysis_params_output_name=json_parsed['input_output']['runtime_name']
 
     input_output_dir=json_parsed['input_output']['input_directory']
-    
+
     os.makedirs(f'{input_output_dir}/{analysis_params_output_name}',exist_ok=True)
     os.chdir(f'{input_output_dir}/{analysis_params_output_name}')
 
@@ -364,6 +366,7 @@ def main(parameter_json):
     else:
         outgroup_bool=np.zeros(len(sampleNames)).astype(bool)
 
+    ancient_samples=json_parsed['sample_labelling']['ancient_samples'].split(',')
     ancient_pattern = re.compile(r'^SP\.*|^M219')
     ancient_bool = np.isin(sampleNames,list(filter(ancient_pattern.match, sampleNames)))
 
@@ -372,7 +375,7 @@ def main(parameter_json):
     # Define goodsamples and filter data, good samples have > avg coverage
     # =============================================================================
 
-    goodsamples = summary_sample_check(coverage_all,filter_parameter_sample_across_sites)
+    goodsamples = summary_sample_check(coverage_all,filter_parameter_sample_across_sites,force_rerun)
 
     #Breakpoint: Too few samples passed filter, checking that at least 2 samples pass QC
     if np.sum(goodsamples) < 2:
@@ -395,22 +398,23 @@ def main(parameter_json):
     ingroup_bool = np.invert(outgroup_bool)
     ingroup_idx = np.nonzero(ingroup_bool)[0]
 
-
-    indel_depth=indel_depth_all[:,goodsamples,:]
-    indel_support=indel_support_all[:,goodsamples]
-    indel_index_for_identites=indel_index_for_identites[:,goodsamples]
-    indel_total_depth=np.nansum(indel_depth,axis=2)
-
     num_samples = len(sampleNames)
 
     coverage_forward_strand = counts[:,0:4,:].sum(axis=1).transpose()
     coverage_reverse_strand = counts[:,4:8,:].sum(axis=1).transpose()
 
-    indel_support[:,outgroup_idx]=np.nan
+
+    # check if dummy array is used:
+    if len(indel_p) > 0:
+        indel_depth=indel_depth_all[:,goodsamples,:]
+        indel_support=indel_support_all[:,goodsamples]
+        indel_index_for_identites=indel_index_for_identites[:,goodsamples]
+        indel_total_depth=np.nansum(indel_depth,axis=2)
+        indel_support[:,outgroup_idx]=np.nan
     #indel_sizes_called[:,outgroup_idx]=np.nan
 
     #goodpos_indels,candidate_indels,indel_sizes_called=identify_indels(indel_depth,indel_support,indel_filtering_params,indel_index_for_identites,indel_identities)
-    
+
     # =============================================================================
     # Extract refnt and define out/in-group bools
     # =============================================================================
@@ -445,7 +449,7 @@ def main(parameter_json):
     # Define mutations we do not trust in each and across samples.
     # goodpos are indices of p that we trust
 
-    failed_within_sample=within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample)
+    failed_within_sample=within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample,force_rerun)
 
     calls[failed_within_sample]=4
 
@@ -457,7 +461,7 @@ def main(parameter_json):
     print("Number of variants after this filtering step: ", intermediate_num_variants)
     print("Number of variants removed: ", variants_removed_failed_within_sample)
 
-    failed_metagenomic=metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool)
+    failed_metagenomic=metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool,force_rerun)
     calls[(failed_metagenomic | failed_within_sample)]=4
 
     intermediate_hasmutation_post_sample_checks_and_metagenomics=(calls != refnti_m) & (calls < 4)
@@ -479,13 +483,13 @@ def main(parameter_json):
             true_chrom=scafNames[x[0]-1]
             position_on_chrom=x[1]+1
             f.write(f'{y}\t{true_chrom}:{position_on_chrom}\n')
-    
+
 
     # Across sample checks 
     ## Remove putative recombinants
     failed_any_QC = ( failed_metagenomic | failed_within_sample)
 
-    failed_recombinants=recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC)
+    failed_recombinants=recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC,force_rerun)
 
 
     ## Filter per site across samples
@@ -495,7 +499,7 @@ def main(parameter_json):
     calls[ siteFilt ,:] = 4 # sites that fail qc -> 4, for all samples incl. outgroup     
 
 
-    failed_optional_siteFilt = site_filter_check(calls,optional_filtering,failed_recombinants,minorAF)
+    failed_optional_siteFilt = site_filter_check(calls,optional_filtering,failed_recombinants,minorAF,force_rerun)
     
     calls[ failed_optional_siteFilt ] = 4 # sites that fail qc -> 4, for all samples incl. outgroup     
 
@@ -575,7 +579,7 @@ def main(parameter_json):
 ## execute 
 
 args = parser.parse_args()
-main(args.parameter_json)
+main(args.parameter_json,args.force)
 
 """
 # LOAD BACK IN RESULTS

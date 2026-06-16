@@ -11,20 +11,13 @@ sys.path.insert(0, SCRIPTS_DIRECTORY)
 # from import read_samplesCSV # not needed since this function is in the next file
 from read_move_link_samplesCSV import *
 
-## Define couple of lists from samples.csv
-## Format: Path,Sample,ReferenceGenome,ProviderName,Subject
-
 minMAF = 0.1
 
-## modified format to Path,Sample,ReferenceGenome,OutGroup 
-## NOTE: samples should be deduplicated bam files
+## Format: Path,Sample,ReferenceGenome,ProviderName,Subject
 spls = "samples.csv"
-[PATH_ls,SAMPLE_ls,REF_Genome_ls,PROVIDER_ls,CLADEID_ls,OUTGROUP_ls] = read_samplesCSV(spls)
-ref_genome_to_non_outgroup_bams_dict = get_non_outgroup_bams_for_freebayes(SAMPLE_ls, REF_Genome_ls, OUTGROUP_ls)
+[PATH_ls,SAMPLE_ls,REF_Genome_ls,CALLINDELS_ls,OUTGROUP_ls] = read_samplesCSV(spls)
+bams_ls = get_bams(SAMPLE_ls, REF_Genome_ls)
 [REF_Genome_ext_ls, SAMPLE_ext_ls] = parse_multi_genome_smpls(SAMPLE_ls, REF_Genome_ls)
-# Write sample_info.csv for each sample
-split_samplesCSV(PATH_ls,SAMPLE_ls,REF_Genome_ls,PROVIDER_ls,CLADEID_ls)
-CLADES_ls = set(CLADEID_ls)
 
 # grab current working directory for qc rules to use
 current_directory = os.getcwd()
@@ -34,47 +27,16 @@ current_directory = os.getcwd()
 
 rule all:
   input:
-    expand("data/{sampleID}/{sampleID}.bam",sampleID=SAMPLE_ls),
-    expand("data/{sampleID}/{sampleID}.bam.bai",sampleID=SAMPLE_ls),
     expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
     "samples_case.csv",
     "cleanUp_done.txt",
-
-rule make_data_links_ancient:
-  input:
-    sample_info_csv="data/{sampleID}/sample_info.csv",
-  output:
-    bams="data/{sampleID}/{sampleID}.bam",
-    bais="data/{sampleID}/{sampleID}.bam.bai",
-  group:
-    'make_link_group',
-  run:
-    ## create symbolic links
-    with open(input.sample_info_csv,'r') as f:
-      this_sample_info = f.readline() # only one line to read
-    this_sample_info = this_sample_info.strip('\n').split(',')
-    path = this_sample_info[0] # remember python indexing starts at 0
-    sample = this_sample_info[1]
-    providername = this_sample_info[3]
-    print(path + '\n' + sample)
-    # make links
-    makelink_ancient(path, sample, providername)
-
-rule create_freebayes_input:
-  input:
-    non_outgroup_bam_ls=lambda wildcards: expand("data/{sampleID}/{sampleID}.bam",reference=wildcards.reference, sampleID=ref_genome_to_non_outgroup_bams_dict[wildcards.reference]),
-  output:
-    non_outgroup_bam_file="0-freebayes_input/ref_{reference}_non_outgroup_bams.txt",
-  group:
-    'pileup_and_filter',
-  shell:
-    "for BAM in {input.non_outgroup_bam_ls}; do echo ${{BAM}} >> {output.non_outgroup_bam_file} ; done ;"
+    "samples.csv"
 
 rule freebayes_indels:
   input:
-    non_outgroup_bam_list=rules.create_freebayes_input.output.non_outgroup_bam_file, 
+    non_outgroup_bam_list="0-freebayes_input/ref_{reference}_non_outgroup_bams.txt", 
     fai="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta.fai",
     ref="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta",
   output:
@@ -86,7 +48,10 @@ rule freebayes_indels:
     "envs/freebayes.yaml", 
   shell:
     """
-        if [ -e {params.regions} ]; then 
+        if [ ! -s {input.non_outgroup_bam_list} ]; then
+            > {output.vcf_raw} ;
+            > {output.vcf_indels} ;
+        elif [ -e {params.regions} ]; then 
             freebayes 72 -t {params.regions} -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
             egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
         else
@@ -98,7 +63,7 @@ rule freebayes_indels:
 
 rule mpileup2vcf_ancient:
   input:
-    bam=rules.make_data_links_ancient.output.bams,
+    bam="data/{reference}/{sampleID}/{sampleID}.bam",
     ref="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta",
   output:
     pileup="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
@@ -109,7 +74,7 @@ rule mpileup2vcf_ancient:
   params:
     vcf_raw="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
     minMAF = minMAF,
-    regions = "regions.bed",
+    regions = "{reference}_regions.bed",
   conda:
     "envs/samtools15_bcftools12.yaml",
   shell:
@@ -190,4 +155,5 @@ rule generate_next_samplescsv:
   shell: 
     """ echo 'Path,Sample,ReferenceGenome,Outgroup' > {output.case_csv} ;"""
     " dir=$(pwd) ;"
-    """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$6}}' {input.csv} >> {output.case_csv} ;"""
+    """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$5}}' {input.csv} >> {output.case_csv} ;"""
+

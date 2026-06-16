@@ -1,27 +1,9 @@
-
 import gzip
-import os
 import numpy as np
 from Bio import SeqIO
-from Bio.Seq import Seq
 import csv
 import glob
-import pandas as pd
 import pickle
-from collections import OrderedDict
-from Bio import Phylo
-import subprocess
-from scipy import stats
-import math
-from matplotlib import rc
-import matplotlib.pyplot as plt
-from Bio.Data import CodonTable
-import collections
-from functools import partial # for gff_parse() and plot_coverage_fwd_rev_stacked()
-from statsmodels.stats.proportion import proportion_confint
-from statsmodels.stats.multitest import multipletests
-import networkx
-
 
 ###################################################################################################
 ## # # # # # # # # # # # # # # # # # Import/Output of data # # # # # # # # # # # # # # # # # # # ##
@@ -306,7 +288,9 @@ def findrecombinantSNPs(p, mutantAF, distance_for_nonsnp, corr_threshold_recombi
         return nonsnp_idx,np.zeros(p.shape)
     # iterate over range to ID highly correlated SNPs
     for range_start,range_end in ranges_to_search:
-        r = mutantAF[[range_start,range_end],:]
+        r = mutantAF[range_start:range_end,:]
+        if r.shape[0]<2:
+            break
         if len(call_matrix_failing_qc) > 0:
             calls_masked_any_sample=(np.sum(call_matrix_failing_qc[[range_start,range_end],:],axis=0)>0)
             r_only_unmasked_samples=r[:,~calls_masked_any_sample]
@@ -314,7 +298,8 @@ def findrecombinantSNPs(p, mutantAF, distance_for_nonsnp, corr_threshold_recombi
         else:
             corrmatrix = np.corrcoef(r)
         [a,b]=np.where(corrmatrix > corr_threshold_recombination)
-        nonsnp_idx=np.concatenate((nonsnp_idx,np.arange(range_start,range_end)[a[np.where(a!=b)]]))
+        if np.sum(np.where(a!=b))>0:
+            nonsnp_idx=np.concatenate((nonsnp_idx,np.arange(range_start,range_end)[a[np.where(a!=b)]]))
     nonsnp_idx=np.unique(nonsnp_idx)
     ## print number of sites which have indication for recombination
     print('\n' + str(nonsnp_idx.shape[0]) + ' of a total ' + str(p.shape[0]) + ' ('  + str((len(nonsnp_idx)/len(p))*100) + '%) positions in goodpos were found to be recombinant.')

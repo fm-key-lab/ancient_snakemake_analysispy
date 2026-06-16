@@ -1,14 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 ---Gathers everything together for candidate_mutation_table---
-NOTE: Still reads in many *.mat files etc. Further purging of matlab necessary!
-
-Output:
-# path_candidate_mutation_table: where to write
-# candidate_mutation_table.mat, ex. results/candidate_mutation_table.mat
-
----
-
 
 # Inputs (changed to argparse usage):
      path_to_p_file: where to find all_positions.mat
@@ -22,36 +14,19 @@ Output:
        diversity.mat files for each sample (space delimited)
 # Output:
      path_candidate_mutation_table: where to write
-     candidate_mutation_table.mat, ex. results/candidate_mutation_table.mat
+     candidate_mutation_table.pickle.gz, ex. results/candidate_mutation_table.mat
 
 # Note: All paths should be relative to pwd!
-
-
-## Version history
-
-     This is adapted from TDL's build_mutation_table_master_smaller_file_size_backup.m
-  #   Arolyn, 2018.12.19: This script was written as part of the transition to snakemake. 
-          It performs the part of the case step that gathers data for
-         Quals and counts and saves candidate_mutation_table.mat
-  #   Arolyn, 2019.02.12: Added another matlab variable that stores indel
-          statistics called 'indel_counter'.
-  #   Tami, 2019.12.12: Converted into python and also added ability save coverage data
-  #   Felix: 2020.01-04: Continous Debugged and adapted script for streamlined Snakemake implementation. 
-  #                      Added argparse for proper argument parsing and optional coverage matrix build.
 """
 
 ''' load libraries '''
-from itertools import count
 import numpy as np
 import pickle
-import scipy.io as sio
 import os
 import sys,argparse
 import gzip
 from scipy import sparse
 import vcf
-from Bio import SeqIO
-import glob
 
 # shared dependency
 from genome_stats import genomestats
@@ -192,6 +167,7 @@ def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_t
         outdir = ''
     else:
         outdir = os.path.dirname(path_to_candidate_mutation_table) + '/'
+        os.makedirs(outdir,exist_ok=True)
     if flag_cov_raw_sparse_matrix:
         all_coverage_per_bp_csr = sparse.csr_matrix(all_coverage_per_bp)
         sparse.save_npz(outdir+'cov_raw_sparsecsr_mat.npz', all_coverage_per_bp_csr,compressed=True)
@@ -234,75 +210,86 @@ def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_t
         coverage_stats[index,13]=np.std(all_coverage_per_bp[index])
 
     print("Parsing indels into CMT")
-    print(f'Loading file',path_to_indel_vcf)
     ## Parse indels into CMT
-    vcf_reader = vcf.Reader(filename=path_to_indel_vcf)
-     ## make 2d matrices for outputting, p x samples
-        # indel_p (p) - start position of variant called in joint indel vcf
-        # depth (3d, pos x samples x (support alt, support non-alt) ) - support highest likelihood alt, support non-alt
-        # indel_support (quals) - difference in genotype likelihood between (indel)variant and reference 
-        # indel_size (calls) - size of variant (#bases added if +, #bases lost if -) for highest likelihood (indel)variant
+    # check if indels is empty file:
+    if os.path.getsize(path_to_indel_vcf) != 0:
+        print(f'Loading file',path_to_indel_vcf)
+        vcf_reader = vcf.Reader(filename=path_to_indel_vcf)
+        ## make 2d matrices for outputting, p x samples
+            # indel_p (p) - start position of variant called in joint indel vcf
+            # depth (3d, pos x samples x (support alt, support non-alt) ) - support highest likelihood alt, support non-alt
+            # indel_support (quals) - difference in genotype likelihood between (indel)variant and reference 
+            # indel_size (calls) - size of variant (#bases added if +, #bases lost if -) for highest likelihood (indel)variant
 
-    collector_indel_support=[]
-    collector_indel_depth=[]
-    collector_index_for_identity=[]
-    collector_indel_identity=[]
-    collector_indel_pos = []
-    for record in vcf_reader:
-        position_on_chr=record.POS
-        chrom=record.CHROM
-        position = ChrStarts[chrom == ScafNames] + position_on_chr - 1 # consistent 0indexing for CMT p matrix
-        ref_len=len(record.REF)
-        variant_impact=np.array([len(alt)-ref_len for alt in record.ALT])
-        indices_indel=np.where(variant_impact != 0)[0]
-        indel_identites=[record.REF]+[str(alt) for alt in record.ALT]
-        if len(indices_indel) != 0: ## complex variants may not include an ins/del
-            depth_at_pos=np.zeros((len(SampleNames),2)) 
-            indel_support_at_pos=np.zeros((len(SampleNames)))
-            indel_index_for_identity=np.zeros((len(SampleNames)))
-            for sample_record in record.samples:
-                sample_name=sample_record.sample
-                sample_name_index=np.where(SampleNames==sample_name)
-                if sample_record.data.GL: ## only parse sample data if there are reads to cover position
-                    #get genotype likelihoods
-                    genotype_likelihoods=np.array(sample_record.data.GL) 
-                    #calculate difference in ML between top two likelihoods (closest to 0)
-                    order_of_support=np.argsort(genotype_likelihoods)
-                    ml_difference=genotype_likelihoods[order_of_support[-1]]-genotype_likelihoods[order_of_support[-2]]
-                    depth_at_indel_all=sample_record.data.DP
-                    reads_for_max_support=sample_record.data.AD[order_of_support[-1]] ## index +1, in AD (reads supporting each call) ref is first entry
-                    ## fill corresponding CMT dataframes (will be converted to numpy arrays later)
-                    depth_at_pos[sample_name_index]=np.array([reads_for_max_support,depth_at_indel_all-reads_for_max_support])
-                    indel_support_at_pos[sample_name_index]=ml_difference
-                    indel_index_for_identity[sample_name_index]=order_of_support[-1] # record what ref,alt1,alt2... index is highest support
-                else:
-                    depth_at_pos[sample_name_index]=np.nan
-                    indel_support_at_pos[sample_name_index]=np.nan
-                    indel_index_for_identity[sample_name_index]=np.nan
-            # set outgroup call ( as np.nan)
-            depth_at_pos[outgroup_idx]=np.nan
-            indel_support_at_pos[outgroup_idx]=np.nan
-            indel_index_for_identity[outgroup_idx]=np.nan
-            # fill possible things, but only if there is an acutal supported alt call
-            if not np.all(indel_index_for_identity[~np.isnan(indel_index_for_identity)]==0):
-                collector_indel_support.append(indel_support_at_pos)
-                collector_indel_depth.append(depth_at_pos)
-                collector_index_for_identity.append(indel_index_for_identity)
-                collector_indel_identity.append(indel_identites)
-                collector_indel_pos.append(position)
-    ## convert to numpy arrays for output
-    
-    indel_support=np.array(collector_indel_support,dtype='float')
-    indel_depth=np.array(collector_indel_depth,dtype='float')
-    indel_index_for_identity=np.array(collector_index_for_identity,dtype='float')
-    indel_p=np.array(collector_indel_pos,dtype='int')
-    indel_identites=np.array(collector_indel_identity,dtype='object')
+        collector_indel_support=[]
+        collector_indel_depth=[]
+        collector_index_for_identity=[]
+        collector_indel_identity=[]
+        collector_indel_pos = []
+        for record in vcf_reader:
+            position_on_chr=record.POS
+            chrom=record.CHROM
+            position = ChrStarts[chrom == ScafNames] + position_on_chr - 1 # consistent 0indexing for CMT p matrix
+            ref_len=len(record.REF)
+            variant_impact=np.array([len(alt)-ref_len for alt in record.ALT])
+            indices_indel=np.where(variant_impact != 0)[0]
+            indel_identites=[record.REF]+[str(alt) for alt in record.ALT]
+            if len(indices_indel) != 0: ## complex variants may not include an ins/del
+                depth_at_pos=np.zeros((len(SampleNames),2)) 
+                indel_support_at_pos=np.zeros((len(SampleNames)))
+                indel_index_for_identity=np.zeros((len(SampleNames)))
+                for sample_record in record.samples:
+                    sample_name=sample_record.sample
+                    sample_name_index=np.where(SampleNames==sample_name)
+                    if sample_record.data.GL: ## only parse sample data if there are reads to cover position
+                        #get genotype likelihoods
+                        genotype_likelihoods=np.array(sample_record.data.GL) 
+                        #calculate difference in ML between top two likelihoods (closest to 0)
+                        order_of_support=np.argsort(genotype_likelihoods)
+                        ml_difference=genotype_likelihoods[order_of_support[-1]]-genotype_likelihoods[order_of_support[-2]]
+                        depth_at_indel_all=sample_record.data.DP
+                        reads_for_max_support=sample_record.data.AD[order_of_support[-1]] ## index +1, in AD (reads supporting each call) ref is first entry
+                        ## fill corresponding CMT dataframes (will be converted to numpy arrays later)
+                        depth_at_pos[sample_name_index]=np.array([reads_for_max_support,depth_at_indel_all-reads_for_max_support])
+                        indel_support_at_pos[sample_name_index]=ml_difference
+                        indel_index_for_identity[sample_name_index]=order_of_support[-1] # record what ref,alt1,alt2... index is highest support
+                    else:
+                        depth_at_pos[sample_name_index]=np.nan
+                        indel_support_at_pos[sample_name_index]=np.nan
+                        indel_index_for_identity[sample_name_index]=np.nan
+                # set outgroup call ( as np.nan)
+                depth_at_pos[outgroup_idx]=np.nan
+                indel_support_at_pos[outgroup_idx]=np.nan
+                indel_index_for_identity[outgroup_idx]=np.nan
+                # fill possible things, but only if there is an acutal supported alt call
+                if not np.all(indel_index_for_identity[~np.isnan(indel_index_for_identity)]==0):
+                    collector_indel_support.append(indel_support_at_pos)
+                    collector_indel_depth.append(depth_at_pos)
+                    collector_index_for_identity.append(indel_index_for_identity)
+                    collector_indel_identity.append(indel_identites)
+                    collector_indel_pos.append(position)
+        ## convert to numpy arrays for output
+        indel_support=np.array(collector_indel_support,dtype='float')
+        indel_depth=np.array(collector_indel_depth,dtype='float')
+        indel_index_for_identity=np.array(collector_index_for_identity,dtype='float')
+        indel_identites=np.array(collector_indel_identity,dtype='object')
+        indel_p=np.array(collector_indel_pos,dtype='int')
+    else: 
+        print("VCF file for indels is empty, creating dummy arrays")
+        depth_at_pos=np.zeros((0,2)) 
+        indel_support_at_pos=np.zeros((0))
+        indel_index_for_identity=np.zeros((0))
+        indel_support=np.array([indel_support_at_pos],dtype='float')
+        indel_depth=np.array([depth_at_pos],dtype='float')
+        indel_index_for_identity=np.array([indel_index_for_identity],dtype='float')
+        indel_p=np.array([],dtype='int')
+        indel_identites=np.array([],dtype='object')
+
     ## Save cmt!   
     with gzip.open(path_to_candidate_mutation_table, 'wb') as f: 
         pickle.dump([SampleNames, p, counts, Quals, in_outgroup, indel_counter, coverage_stats,indel_p,indel_depth,indel_support,indel_identites,indel_index_for_identity], f,protocol=4) # protocol=4 for storage of files >4gb
     
     print('DONE')
-
 
 if __name__ == "__main__":
     path_to_refgenome_dir=args.refgenomedir
@@ -319,4 +306,5 @@ if __name__ == "__main__":
         flag_cov_raw_sparse_matrix = True
         print('Selected to build double normalized coverage matrix. Raw coverage matrix will be build, too.')
     main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_to_outgroup_boolean_file, path_to_list_of_quals_files, path_to_list_of_diversity_files, path_to_indel_vcf, path_to_candidate_mutation_table, flag_cov_raw_sparse_matrix,flag_cov_norm_sparse_scale_matrix)
+
 
