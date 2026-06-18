@@ -19,7 +19,6 @@ import numpy as np
 import gzip
 import json
 
-
 sys.path.append("./local_analysis_initial_qc")
 import local_analysis_initial_qc_modules as apy
 
@@ -36,15 +35,15 @@ parser.add_argument('-f', '--force', default=False, action='store_true',
                     help='Force rerun QC (overwrite and do not load previously written filtering .npz files)')
 
 # helper functions
-def summary_sample_check(coverage_all,filter_parameter_sample_across_sites,force_rerun):
+def summary_sample_check(coverage_all,filter_sample_across_sites_params,force_rerun):
     # Within sample checks, across all positions
     goodsamples_output_path=f'goodsamples.npz'
     if os.path.exists(f'{goodsamples_output_path}') and not force_rerun:
         print(f'summary_sample_check: existing output file for this check! loading {goodsamples_output_path}')
         goodsamples = np.load(f'{goodsamples_output_path}')['arr_0']
     else:
-        passed_mean_coverage =  np.mean(coverage_all, axis=0) >= filter_parameter_sample_across_sites['min_average_coverage_to_include_sample'] 
-        passed_median_coverage =  np.median(coverage_all,axis=0) >= filter_parameter_sample_across_sites['min_median_coverage_to_include_sample']
+        passed_mean_coverage =  np.mean(coverage_all, axis=0) >= filter_sample_across_sites_params['min_average_coverage_to_include_sample'] 
+        passed_median_coverage =  np.median(coverage_all,axis=0) >= filter_sample_across_sites_params['min_median_coverage_to_include_sample']
 
         goodsamples=passed_mean_coverage & passed_median_coverage
         np.savez_compressed(f'{goodsamples_output_path}',goodsamples)
@@ -52,7 +51,7 @@ def summary_sample_check(coverage_all,filter_parameter_sample_across_sites,force
     return goodsamples
 
 #TODO: add median coverage filter
-def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample,force_rerun,optional_within_sample_checks=[]):
+def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_site_per_sample_params,force_rerun,optional_within_sample_checks=[]):
     # Witin sample checks, pos by pos
     ## Filter per mutation
     failed_within_sample_output_path=f'failed_within_sample.npz'
@@ -60,25 +59,25 @@ def within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_stra
         print(f'within_sample_checks: existing output file for this check! loading {failed_within_sample_output_path}')
         failed_within_sample = np.load(f'{failed_within_sample_output_path}')['arr_0']
     else:
-        failed_quals = (quals < filter_parameter_site_per_sample['min_qual_for_call'])
-        failed_maf=(maf < filter_parameter_site_per_sample['min_maf_for_call'])
-        failed_forward=(coverage_forward_strand < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
-        failed_reverse=(coverage_reverse_strand < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
-        failed_cov=(coverage_reverse_strand + coverage_forward_strand < filter_parameter_site_per_sample['min_cov_on_pos'])
+        failed_quals = (quals < filter_site_per_sample_params['min_qual_for_call'])
+        failed_maf=(maf < filter_site_per_sample_params['min_maf_for_call'])
+        failed_forward=(coverage_forward_strand < filter_site_per_sample_params['min_cov_per_strand_for_call'])
+        failed_reverse=(coverage_reverse_strand < filter_site_per_sample_params['min_cov_per_strand_for_call'])
+        failed_cov=(coverage_reverse_strand + coverage_forward_strand < filter_site_per_sample_params['min_cov_on_pos'])
         failed_indels=(indels > (0.5*coverage) )
         # summarize and output
         failed_within_sample = (failed_quals | failed_maf | failed_forward | failed_reverse | failed_cov | failed_indels)
         np.savez_compressed(f'{failed_within_sample_output_path}',failed_within_sample)
     return failed_within_sample
 
-def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC,force_rerun):
+def recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_site_across_samples_params,failed_any_QC,force_rerun):
     failed_recombinant_output_path=f'failed_recombinant.npz'
     if os.path.exists(f'{failed_recombinant_output_path}') and not force_rerun:
         print(f'recombinant_check: existing output file for this check! loading {failed_recombinant_output_path}')
         failed_recombinants = np.load(f'{failed_recombinant_output_path}')['arr_0']
     else:
-        recombination_distance=filter_parameter_site_across_samples['distance_threshold_recombination']
-        recombination_correlation=filter_parameter_site_across_samples['correlation_threshold_recombination']
+        recombination_distance=filter_site_across_samples_params['distance_threshold_recombination']
+        recombination_correlation=filter_site_across_samples_params['correlation_threshold_recombination']
         if optional_filtering['recombination'] == 'Ancient':
             failed_recombinants = apy.findrecombinantSNPs(p,mutantAF[ : , ancient_bool ],recombination_distance,recombination_correlation, failed_any_QC[ : , ancient_bool ] )[1]
         elif optional_filtering['recombination'] == 'All':
@@ -97,10 +96,10 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,ancient_bool,force_rer
     bed_histogram_path='bed_files/final_out_files/*_genome_coverage_hist.tsv.gz'
     bed_zero_covg_path = 'bed_files/final_out_files/*_merged_zero_covg_regions.tsv.gz'
 
-    failed_genomic_islands = apy.filter_bed_0_cov_regions(bed_zero_covg_path,p,scafNames,chrStarts,sampleNames,filter_parameter_site_per_sample['max_prop_0_covg_ancient'])
+    failed_genomic_islands = apy.filter_bed_0_cov_regions(bed_zero_covg_path,p,scafNames,chrStarts,sampleNames,filter_site_per_sample_params['max_prop_0_covg_ancient'])
     failed_genomic_islands[:,~ancient_bool]=False
 
-    failed_coverage_percentile=apy.filter_bed_cov_hist(bed_histogram_path,p,scafNames,chrStarts,sampleNames,coverage,filter_parameter_site_per_sample['max_percentile_cov_ancient'],two_tailed=False,upper=True)
+    failed_coverage_percentile=apy.filter_bed_cov_hist(bed_histogram_path,p,scafNames,chrStarts,sampleNames,coverage,filter_site_per_sample_params['max_percentile_cov_ancient'],two_tailed=False,upper=True)
     failed_coverage_percentile[:,~ancient_bool]=False
     """
     failed_metagenomic_output_path='failed_metagenomic.npz'
@@ -295,15 +294,17 @@ def main(parameter_json,force_rerun=False):
     # coverage, and particular samples
     # adjust within json!
 
-    filter_parameter_sample_across_sites = filtering_dicts['filter_parameter_sample_across_sites']
+    filter_sample_across_sites_params = filtering_dicts['filter_sample_across_sites_params']
 
-    filter_parameter_site_per_sample = filtering_dicts['filter_parameter_site_per_sample']
+    filter_site_per_sample_params = filtering_dicts['filter_site_per_sample_params']
 
-    filter_parameter_site_across_samples = filtering_dicts['filter_parameter_site_across_samples']
+    filter_site_across_samples_params = filtering_dicts['filter_site_across_samples_params']
 
     indel_filtering_params = filtering_dicts['indel_filtering_params']
 
     optional_filtering = filtering_dicts['optional_filtering']
+
+    blast_masking_params = filtering_dicts['blast_masking_params']
 
     ######################################################
     ### SETUP DONE ###### SETUP DONE ###### SETUP DONE ###
@@ -375,7 +376,7 @@ def main(parameter_json,force_rerun=False):
     # Define goodsamples and filter data, good samples have > avg coverage
     # =============================================================================
 
-    goodsamples = summary_sample_check(coverage_all,filter_parameter_sample_across_sites,force_rerun)
+    goodsamples = summary_sample_check(coverage_all,filter_sample_across_sites_params,force_rerun)
 
     #Breakpoint: Too few samples passed filter, checking that at least 2 samples pass QC
     if np.sum(goodsamples) < 2:
@@ -449,7 +450,7 @@ def main(parameter_json,force_rerun=False):
     # Define mutations we do not trust in each and across samples.
     # goodpos are indices of p that we trust
 
-    failed_within_sample=within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_parameter_site_per_sample,force_rerun)
+    failed_within_sample=within_sample_checks(quals,maf,coverage_forward_strand,coverage_reverse_strand,indels,coverage,filter_site_per_sample_params,force_rerun)
 
     calls[failed_within_sample]=4
 
@@ -489,13 +490,13 @@ def main(parameter_json,force_rerun=False):
     ## Remove putative recombinants
     failed_any_QC = ( failed_metagenomic | failed_within_sample)
 
-    failed_recombinants=recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_parameter_site_across_samples,failed_any_QC,force_rerun)
+    failed_recombinants=recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_site_across_samples_params,failed_any_QC,force_rerun)
 
 
     ## Filter per site across samples
     # Ignore here outgroup samples!
-    siteFilt = np.any(( (calls[:,ingroup_bool]>3).sum(axis=1) >= ((num_samples-np.sum(outgroup_bool)) * filter_parameter_site_across_samples['max_fraction_ambiguous_samples']) \
-                            ,np.median( coverage[:,ingroup_bool], axis=1) < filter_parameter_site_across_samples['min_median_coverage_position'] ),axis=0)
+    siteFilt = np.any(( (calls[:,ingroup_bool]>3).sum(axis=1) >= ((num_samples-np.sum(outgroup_bool)) * filter_site_across_samples_params['max_fraction_ambiguous_samples']) \
+                            ,np.median( coverage[:,ingroup_bool], axis=1) < filter_site_across_samples_params['min_median_coverage_position'] ),axis=0)
     calls[ siteFilt ,:] = 4 # sites that fail qc -> 4, for all samples incl. outgroup     
 
 
@@ -525,10 +526,8 @@ def main(parameter_json,force_rerun=False):
     if json_parsed['input_output']['save_fasta']:
         generate_fasta(goodpos,calls,sampleNames,refnt,refgenome,analysis_params_output_name,name_append='')
 
-
     if optional_filtering['run_blast_masking']:
-        blast_masking()
-
+        blast_masking(blast_masking_params)
 
     save_qc_filtered(goodpos,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name)
 
@@ -614,7 +613,7 @@ def update_counts_for_singleton(counts,call_support_remaining,sample_index_this_
     return counts
 
 
-def update_matrices_post_singleton_counts_update(counts_updated,calls_previous,maNT_previous,refnti_m,filter_parameter_site_per_sample,sample_pos_to_output):
+def update_matrices_post_singleton_counts_update(counts_updated,calls_previous,maNT_previous,refnti_m,filter_site_per_sample_params,sample_pos_to_output):
     # Recalculate entire datastructures    
     coverage_forward_strand_updated = counts_updated[:,0:4,:].sum(axis=1).transpose()
     coverage_reverse_strand_updated = counts_updated[:,4:8,:].sum(axis=1).transpose()
@@ -622,10 +621,10 @@ def update_matrices_post_singleton_counts_update(counts_updated,calls_previous,m
     calls_updated = maNT_updated
     mutantAF_updated = np.zeros(maNT_updated.shape)
     mutantAF_updated[maNT_updated != refnti_m] = maf_updated[ maNT_updated != refnti_m]; 
-    failed_maf_updated=(maf_updated < filter_parameter_site_per_sample['min_maf_for_call'])
-    failed_forward_updated=(coverage_forward_strand_updated < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
-    failed_reverse_updated=(coverage_reverse_strand_updated < filter_parameter_site_per_sample['min_cov_per_strand_for_call'])
-    failed_cov_updated=(coverage_reverse_strand_updated + coverage_forward_strand_updated < filter_parameter_site_per_sample['min_cov_on_pos'])
+    failed_maf_updated=(maf_updated < filter_site_per_sample_params['min_maf_for_call'])
+    failed_forward_updated=(coverage_forward_strand_updated < filter_site_per_sample_params['min_cov_per_strand_for_call'])
+    failed_reverse_updated=(coverage_reverse_strand_updated < filter_site_per_sample_params['min_cov_per_strand_for_call'])
+    failed_cov_updated=(coverage_reverse_strand_updated + coverage_forward_strand_updated < filter_site_per_sample_params['min_cov_on_pos'])
     failed_any_QC_updated = ( failed_maf_updated | failed_forward_updated | failed_reverse_updated | failed_cov_updated )
     calls_updated[failed_any_QC_updated] = 4
     # get indices to subset to only ancient singleton positions investigated:
@@ -729,7 +728,7 @@ def update_matrices_post_singleton_counts_update(counts_updated,calls_previous,m
     maNT,
     minorNT, 
     minorAF, 
-    mutantAF ] = update_matrices_post_singleton_counts_update(counts,calls,maNT,refnti_m,filter_parameter_site_per_sample,sample_pos_to_output)
+    mutantAF ] = update_matrices_post_singleton_counts_update(counts,calls,maNT,refnti_m,filter_site_per_sample_params,sample_pos_to_output)
 
     # confirm no positions other than those set above have changed:
     print("Only changed positions are within the set of indices to update?:",len(np.where(calls[indices_to_update,samples_indices_to_update]!=calls_copy[indices_to_update,samples_indices_to_update])[0]) == len(np.where(calls!=calls_copy)[0]))
