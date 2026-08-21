@@ -1,7 +1,4 @@
-
 # coding: utf-8
-
-# In[ ]:
 
 import os
 from pathlib import Path
@@ -44,7 +41,7 @@ def makelink_ancient(paths,samples,references):
     for bam,sample,reference in zip(paths,samples,references):
         os.makedirs(f'data/{reference}/{sample}', exist_ok=True)
         subprocess.run(f'ln -s -T {bam} data/{reference}/{sample}/{sample}.bam || echo data/{reference}/{sample}/{sample}.bam link path already exists, skipping', shell=True)
-        subprocess.run(f'ln -s -T {bam} data/{reference}/{sample}/{sample}.bam.bai || echo data/{reference}/{sample}/{sample}.bam.bai link path already exists, skipping', shell=True)
+        subprocess.run(f'ln -s -T {bam}.bai data/{reference}/{sample}/{sample}.bam.bai || echo data/{reference}/{sample}/{sample}.bam.bai link path already exists, skipping', shell=True)
 
 def get_bams(SAMPLE_ls, REF_Genome_ls):
     ## note: multiple ref genomes + varied ingroup/outgroup identity might be edgecase, if a sample is ingrp for one ref, outgrp for the other
@@ -76,5 +73,3 @@ def generate_freebayes_input(SAMPLE_ls, REF_Genome_ls, CALLINDELS_ls, OUTGROUP_l
         with open(f'0-freebayes_input/ref_{refgenome}_non_outgroup_bams.txt', "w") as f:
             for bam in non_outgroup_sample_ls[refgenome]:
                 f.write(f"{bam}\n")
-
-
