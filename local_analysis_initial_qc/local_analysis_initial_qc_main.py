@@ -172,6 +172,20 @@ def site_filter_check(calls,optional_filtering,failed_recombinants,minorAF,force
         np.savez_compressed(f'{failed_site_filter_output_path}',failed_optional_siteFilt)
     return failed_optional_siteFilt
 
+def ana_mutation_quality_check(calls,quals,ingroup_bool,analysis_params_output_name,force_rerun):
+    mutqual_output_path = f'mutQual.npz'
+    mutqualisolates_output_path = f'mutQualIsolates.npz'
+    if os.path.exists(f'{mutqual_output_path}') and os.path.exists(f'{mutqualisolates_output_path}') and not force_rerun:
+        print(f'ana_mutation_quality_check: existing file exists! loading {mutqual_output_path} and {mutqualisolates_output_path}')
+        mutQual = np.load(f'{mutqual_output_path}')['arr_0']
+        mutQualIsolates = np.load(f'{mutqualisolates_output_path}')['arr_0']
+    else:
+        [mutQual, mutQualIsolates] = apy.ana_mutation_quality(calls[:,ingroup_bool],quals[:,ingroup_bool]) # get FQ value for SNP across samples. mutQualIsolates contains sample indices for sample pair FQ based on. 
+        np.savez_compressed(f'{mutqual_output_path}',mutQual)
+        np.savez_compressed(f'{mutqualisolates_output_path}',mutQualIsolates)
+        mutQual = np.nan_to_num(mutQual, nan=-1) # turn mutQual nan's to -1; necessary to avoid later warning
+    return mutQual, mutQualIsolates
+
 def blast_masking():
     pass
 
@@ -200,7 +214,7 @@ def projection_proportion_check(minimum_called_goodpos_for_projection,projection
     print(f'Projectable samples must have at least {minimum_called_goodpos_for_projection*100:.2f}% of positions projectable.')
     projectable_samples = np.full(projection_samples.shape, False)
     for i, sample in enumerate(projection_samples):
-        prop_projectable_positions = 1 - np.sum(non_projectable_positions,axis=0)/len(goodpos)
+        prop_projectable_positions = 1 - np.sum(non_projectable_positions[:, i], axis=0) / len(goodpos)
         if prop_projectable_positions >= minimum_called_goodpos_for_projection:
             print(f'Sample {sample} is projectable with {prop_projectable_positions*100:.2f}% of positions projectable.')
             projectable_samples[i] = True
@@ -208,10 +222,13 @@ def projection_proportion_check(minimum_called_goodpos_for_projection,projection
             print(f'Sample {sample} is NOT projectable with only {prop_projectable_positions*100:.2f}% of positions projectable.')
     return projectable_samples
 
-def projection_positions_check(generate_projection_params,maf,quals_all):
+def projection_positions_check(generate_projection_params,coverage_projectable,maf_projectable,qualls_projectable):
     print('Assessing projectable positions...')
-    print(f'Projectable positions must have at least {generate_projection_params["minimum_maf_for_projection"]} MAF and {generate_projection_params["minimum_qual_for_projection"]} QUAL.')
-    non_projectable_positions = np.where((maf < generate_projection_params['minimum_maf_for_projection']) & (quals_all < generate_projection_params['minimum_qual_for_projection']))[0]
+    print(f'Projectable positions must have at least {generate_projection_params["minimum_maf_for_projection"]} MAF, {generate_projection_params["minimum_qual_for_projection"]} QUAL, and {generate_projection_params["minimum_position_coverage_for_projection"]} position coverage.')
+    failed_maf = maf_projectable < generate_projection_params['minimum_maf_for_projection']
+    failed_qual = qualls_projectable < generate_projection_params['minimum_qual_for_projection']
+    failed_coverage = coverage_projectable < generate_projection_params['minimum_position_coverage_for_projection']
+    non_projectable_positions = failed_maf | failed_qual | failed_coverage.T
     return non_projectable_positions
 
 def generate_projection(generate_projection_params,goodsamples,goodpos,counts_all,quals_all,sampleNames_all):
@@ -219,22 +236,25 @@ def generate_projection(generate_projection_params,goodsamples,goodpos,counts_al
     # find projectable samples:
     print('Generating projection of data for downstream analyses...')
     print(f'Projectable samples must have at least {generate_projection_params["minimum_sample_coverage_for_projection"]} mean coverage across all positions.')
-    candidate_projectable_samples = np.intersect1d(np.where(np.mean(counts_all[ : , :, : ],axis=2) >= generate_projection_params['minimum_sample_coverage_for_projection'])[0], ~goodsamples)
+    candidate_projectable_samples = ( np.mean( np.sum(counts_all,axis=1),axis=1) >= generate_projection_params['minimum_sample_coverage_for_projection'] ) & ( ~goodsamples )
+    candidate_projectable_samples_names = sampleNames_all[candidate_projectable_samples]
 
     # generate downstream matrices
-    [maf, maNT, minorNT, minorAF] = apy.div_major_allele_freq(counts_all[candidate_projectable_samples,: , : ])
+    [maf_projectable, maNT_projectable, minorNT, minorAF] = apy.div_major_allele_freq(counts_all[candidate_projectable_samples,: , : ])
 
     # assess projectable positions:
-    non_projectable_positions = projection_positions_check(generate_projection_params,maf,quals_all[candidate_projectable_samples,: , : ])
+    quals_projectable = quals_all[ : , candidate_projectable_samples]
+    coverage_projectable = np.sum(counts_all[candidate_projectable_samples,: , :], axis=1)
+    non_projectable_positions = projection_positions_check(generate_projection_params,coverage_projectable,maf_projectable,quals_projectable)
 
     # assess proportion of projectable positions for each projectable sample, filter if necessary
     projectable_samples = projection_proportion_check(generate_projection_params['minimum_called_goodpos_for_projection'],sampleNames_all[candidate_projectable_samples],goodpos,non_projectable_positions)
-    
+
     # prepare matrices for generate fasta function
-    calls_projection = maNT[ : , projectable_samples ]
+    calls_projection = maNT_projectable
     calls_projection[non_projectable_positions] = 4  # Set non-projectable positions to 'N' (4)
 
-    sampleNames_projection = sampleNames_all[projectable_samples]
+    sampleNames_projection = candidate_projectable_samples_names[projectable_samples]
     output_name_projection = generate_projection_params['output_name_projection']
 
     print(f'Generating fasta for projectable samples using prefix: {output_name_projection}')
@@ -560,8 +580,7 @@ def main(parameter_json,force_rerun=False):
 
     # NOTE: func below takes forever with many SNPs...saved below
     # TODO: update mutation quality to check if path exists
-    [mutQual, mutQualIsolates] = apy.ana_mutation_quality(calls[:,ingroup_bool],quals[:,ingroup_bool]) # get FQ value for SNP across samples. mutQualIsolates contains sample indices for sample pair FQ based on. 
-    mutQual = np.nan_to_num(mutQual, nan=-1) # turn mutQual nan's to -1; necessary to avoid later warning
+    [mutQual, mutQualIsolates] = ana_mutation_quality_check(calls,quals,ingroup_bool,analysis_params_output_name,force_rerun)
 
     # translate filtered calls of ingroup into goodpos. mutations we believe. fixedmutation part removed in v6.
     hasmutation = (calls != refnti_m) & (calls < 4) & (np.tile(mutQual,(1,num_samples)) >= 1) # consider only ingroup samples; mutQual >= 1 is very loose. Important filter with low qual data! refnt not ancnt!!!
