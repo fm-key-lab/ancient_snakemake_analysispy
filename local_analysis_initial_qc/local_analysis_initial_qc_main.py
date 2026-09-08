@@ -585,7 +585,7 @@ def main(parameter_json,force_rerun=False):
     save_qc_filtered(goodpos,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name)
 
     if generate_projection_params['generate_projection']:
-        generate_projection(goodpos,generate_projection_params,counts_all,quals_all,coverage_all)
+        generate_projection(generate_projection_params,goodsamples,goodpos,counts_all,quals_all,sampleNames_all)
         
 
     """
