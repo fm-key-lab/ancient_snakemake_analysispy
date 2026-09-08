@@ -355,7 +355,9 @@ def main(parameter_json,force_rerun=False):
 
     blast_masking_params = filtering_dicts['blast_masking_params']
 
-    generate_projection_params = filtering_dicts['generate_projection_params']
+    # Projection parameters
+    # =============================================================================
+    generate_projection_params = json_parsed['generate_projection_params']
 
     ######################################################
     ### SETUP DONE ###### SETUP DONE ###### SETUP DONE ###
