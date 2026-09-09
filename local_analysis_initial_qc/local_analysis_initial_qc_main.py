@@ -172,10 +172,24 @@ def site_filter_check(calls,optional_filtering,failed_recombinants,minorAF,force
         np.savez_compressed(f'{failed_site_filter_output_path}',failed_optional_siteFilt)
     return failed_optional_siteFilt
 
+def ana_mutation_quality_check(calls,quals,ingroup_bool,analysis_params_output_name,force_rerun):
+    mutqual_output_path = f'mutQual.npz'
+    mutqualisolates_output_path = f'mutQualIsolates.npz'
+    if os.path.exists(f'{mutqual_output_path}') and os.path.exists(f'{mutqualisolates_output_path}') and not force_rerun:
+        print(f'ana_mutation_quality_check: existing file exists! loading {mutqual_output_path} and {mutqualisolates_output_path}')
+        mutQual = np.load(f'{mutqual_output_path}')['arr_0']
+        mutQualIsolates = np.load(f'{mutqualisolates_output_path}')['arr_0']
+    else:
+        [mutQual, mutQualIsolates] = apy.ana_mutation_quality(calls[:,ingroup_bool],quals[:,ingroup_bool]) # get FQ value for SNP across samples. mutQualIsolates contains sample indices for sample pair FQ based on. 
+        np.savez_compressed(f'{mutqual_output_path}',mutQual)
+        np.savez_compressed(f'{mutqualisolates_output_path}',mutQualIsolates)
+        mutQual = np.nan_to_num(mutQual, nan=-1) # turn mutQual nan's to -1; necessary to avoid later warning
+    return mutQual, mutQualIsolates
+
 def blast_masking():
     pass
 
-def generate_fasta(goodpos_final2useTree,calls,sampleNames,refnt,refgenome,analysis_params_output_name,name_append=''):
+def generate_fasta(goodpos_final2useTree,calls,sampleNames,analysis_params_output_name,refnt=None,refgenome=None,name_append=''):
     # get data and filter for goodpos_final
     calls_for_treei = calls[ goodpos_final2useTree, : ]; 
 
@@ -185,12 +199,67 @@ def generate_fasta(goodpos_final2useTree,calls,sampleNames,refnt,refgenome,analy
     # translate index to nucleotide
     calls_for_tree = apy.idx2nts(calls_for_treei) # ATCGN translation
 
-    # add reference nucleotide for all positions
-    refgenome_nts_for_tree=refnt[goodpos_final2useTree]
-    calls_for_tree_ref_outgroup = np.concatenate((apy.idx2nts(refgenome_nts_for_tree[:, None]),calls_for_tree),axis=1)
+    # optionally add reference nucleotide for all positions
+    if refnt is not None and refgenome is not None:
+        refgenome_nts_for_tree=refnt[goodpos_final2useTree]
+        calls_for_tree_ref_outgroup = np.concatenate((apy.idx2nts(refgenome_nts_for_tree[:, None]),calls_for_tree),axis=1)
 
-    treesampleNamesLong_ref_outgroup = np.append([f'{refgenome}'],treesampleNamesLong)
-    apy.write_calls_sampleName_to_fasta(calls_for_tree_ref_outgroup,treesampleNamesLong_ref_outgroup,f'{analysis_params_output_name}{name_append}')
+        treesampleNamesLong_ref_outgroup = np.append([f'{refgenome}'],treesampleNamesLong)
+        apy.write_calls_sampleName_to_fasta(calls_for_tree_ref_outgroup,treesampleNamesLong_ref_outgroup,f'{analysis_params_output_name}{name_append}')
+    else:
+        apy.write_calls_sampleName_to_fasta(calls_for_tree,treesampleNamesLong,f'{analysis_params_output_name}{name_append}')
+
+def projection_proportion_check(minimum_called_goodpos_for_projection,projection_samples,goodpos,non_projectable_positions):
+    print('Assessing projectable samples based on proportion of projectable positions')
+    print(f'Projectable samples must have at least {minimum_called_goodpos_for_projection*100:.2f}% of positions projectable.')
+    projectable_samples = np.full(projection_samples.shape, False)
+    for i, sample in enumerate(projection_samples):
+        prop_projectable_positions = 1 - np.sum(non_projectable_positions[:, i], axis=0) / len(goodpos)
+        if prop_projectable_positions >= minimum_called_goodpos_for_projection:
+            print(f'Sample {sample} is projectable with {prop_projectable_positions*100:.2f}% of positions projectable.')
+            projectable_samples[i] = True
+        else:
+            print(f'Sample {sample} is NOT projectable with only {prop_projectable_positions*100:.2f}% of positions projectable.')
+    return projectable_samples
+
+def projection_positions_check(generate_projection_params,coverage_projectable,maf_projectable,qualls_projectable):
+    print('Assessing projectable positions...')
+    print(f'Projectable positions must have at least {generate_projection_params["minimum_maf_for_projection"]} MAF, {generate_projection_params["minimum_qual_for_projection"]} QUAL, and {generate_projection_params["minimum_position_coverage_for_projection"]} position coverage.')
+    failed_maf = maf_projectable < generate_projection_params['minimum_maf_for_projection']
+    failed_qual = qualls_projectable < generate_projection_params['minimum_qual_for_projection']
+    failed_coverage = coverage_projectable < generate_projection_params['minimum_position_coverage_for_projection']
+    non_projectable_positions = failed_maf | failed_qual | failed_coverage.T
+    return non_projectable_positions
+
+def generate_projection(generate_projection_params,goodsamples,goodpos,counts_all,quals_all,sampleNames_all):
+    # generate projection of data for downstream analyses
+    # find projectable samples:
+    print('Generating projection of data for downstream analyses...')
+    print(f'Projectable samples must have at least {generate_projection_params["minimum_sample_coverage_for_projection"]} mean coverage across all positions.')
+    candidate_projectable_samples = ( np.mean( np.sum(counts_all,axis=1),axis=1) >= generate_projection_params['minimum_sample_coverage_for_projection'] ) & ( ~goodsamples )
+    candidate_projectable_samples_names = sampleNames_all[candidate_projectable_samples]
+
+    # generate downstream matrices
+    [maf_projectable, maNT_projectable, minorNT, minorAF] = apy.div_major_allele_freq(counts_all[candidate_projectable_samples,: , : ])
+
+    # assess projectable positions:
+    quals_projectable = quals_all[ : , candidate_projectable_samples]
+    coverage_projectable = np.sum(counts_all[candidate_projectable_samples,: , :], axis=1)
+    non_projectable_positions = projection_positions_check(generate_projection_params,coverage_projectable,maf_projectable,quals_projectable)
+
+    # assess proportion of projectable positions for each projectable sample, filter if necessary
+    projectable_samples = projection_proportion_check(generate_projection_params['minimum_called_goodpos_for_projection'],sampleNames_all[candidate_projectable_samples],goodpos,non_projectable_positions)
+
+    # prepare matrices for generate fasta function
+    calls_projection = maNT_projectable
+    calls_projection[non_projectable_positions] = 4  # Set non-projectable positions to 'N' (4)
+
+    sampleNames_projection = candidate_projectable_samples_names[projectable_samples]
+    output_name_projection = generate_projection_params['output_name_projection']
+
+    print(f'Generating fasta for projectable samples using prefix: {output_name_projection}')
+    # generate fasta for projection samples
+    generate_fasta(goodpos,calls_projection,sampleNames_projection,output_name_projection)
 
 def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name):
     # output fully reduced and filtered CMT
@@ -305,6 +374,10 @@ def main(parameter_json,force_rerun=False):
     optional_filtering = filtering_dicts['optional_filtering']
 
     blast_masking_params = filtering_dicts['blast_masking_params']
+
+    # Projection parameters
+    # =============================================================================
+    generate_projection_params = json_parsed['generate_projection_params']
 
     ######################################################
     ### SETUP DONE ###### SETUP DONE ###### SETUP DONE ###
@@ -507,8 +580,7 @@ def main(parameter_json,force_rerun=False):
 
     # NOTE: func below takes forever with many SNPs...saved below
     # TODO: update mutation quality to check if path exists
-    [mutQual, mutQualIsolates] = apy.ana_mutation_quality(calls[:,ingroup_bool],quals[:,ingroup_bool]) # get FQ value for SNP across samples. mutQualIsolates contains sample indices for sample pair FQ based on. 
-    mutQual = np.nan_to_num(mutQual, nan=-1) # turn mutQual nan's to -1; necessary to avoid later warning
+    [mutQual, mutQualIsolates] = ana_mutation_quality_check(calls,quals,ingroup_bool,analysis_params_output_name,force_rerun)
 
     # translate filtered calls of ingroup into goodpos. mutations we believe. fixedmutation part removed in v6.
     hasmutation = (calls != refnti_m) & (calls < 4) & (np.tile(mutQual,(1,num_samples)) >= 1) # consider only ingroup samples; mutQual >= 1 is very loose. Important filter with low qual data! refnt not ancnt!!!
@@ -524,12 +596,16 @@ def main(parameter_json,force_rerun=False):
     print(goodpos.size,'goodpos found.')
 
     if json_parsed['input_output']['save_fasta']:
-        generate_fasta(goodpos,calls,sampleNames,refnt,refgenome,analysis_params_output_name,name_append='')
+        generate_fasta(goodpos,calls,sampleNames,analysis_params_output_name,refnt,refgenome,name_append='')
 
     if optional_filtering['run_blast_masking']:
         blast_masking(blast_masking_params)
 
     save_qc_filtered(goodpos,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name)
+
+    if generate_projection_params['generate_projection']:
+        generate_projection(generate_projection_params,goodsamples,goodpos,counts_all,quals_all,sampleNames_all)
+        
 
     """
     #
