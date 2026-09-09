@@ -53,6 +53,7 @@
         "generate_projection": true,
         "output_name_projection": "projection",
         "minimum_sample_coverage_for_projection": 1,
+        "minimum_position_coverage_for_projection": 1,
         "minimum_maf_for_projection": 1,
         "minimum_qual_for_projection": 30,
         "minimum_called_goodpos_for_projection": 0.1
