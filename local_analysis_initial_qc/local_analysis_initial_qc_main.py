@@ -261,7 +261,7 @@ def generate_projection(generate_projection_params,goodsamples,goodpos,counts_al
     # generate fasta for projection samples
     generate_fasta(goodpos,calls_projection,sampleNames_projection,output_name_projection)
 
-def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name):
+def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,ancient_sample_indices,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name):
     # output fully reduced and filtered CMT
     cmtFile_sub_gp = f'final_cmts/{analysis_params_output_name}_post_initialqc_candidate_mutation_table.pickle.gz'
     os.makedirs('final_cmts', exist_ok=True)
@@ -276,6 +276,7 @@ def save_qc_filtered(goodpos_final,counts,quals,coverage_forward_strand,coverage
             'refgenome': refgenome,  
             'sampleNames': sampleNames,  
             'outgroup_bool': outgroup_bool,  
+            'ancient_sample_indices': ancient_sample_indices,
             'contig_positions': contig_positions[goodpos_final, :],
             'mutantAF': mutantAF[goodpos_final, :],
             'maf': maf[goodpos_final, :],
@@ -395,7 +396,7 @@ def main(parameter_json,force_rerun=False):
 
     # Load data from candidate_mutation_
     # =============================================================================
-    [quals,p,counts,in_outgroup,sampleNames,indel_counter,coverage_stats,indel_p,indel_depth,indel_support,indel_identities,indel_index_for_identites] = apy.read_candidate_mutation_table_pickle_gzip(f'{input_output_dir}/candidate_mutation_table.pickle.gz')
+    [quals,p,counts,in_outgroup,ancient_sample_indices,sampleNames,indel_counter,coverage_stats,indel_p,indel_depth,indel_support,indel_identities,indel_index_for_identites] = apy.read_candidate_mutation_table_pickle_gzip(f'{input_output_dir}/candidate_mutation_table.pickle.gz')
 
     # 
     # Mean cov per samples based on all positions in counts (aka p)
@@ -440,9 +441,7 @@ def main(parameter_json,force_rerun=False):
     else:
         outgroup_bool=np.zeros(len(sampleNames)).astype(bool)
 
-    ancient_samples=json_parsed['sample_labelling']['ancient_samples'].split(',')
-    ancient_pattern = re.compile(r'^SP\.*|^M219')
-    ancient_bool = np.isin(sampleNames,list(filter(ancient_pattern.match, sampleNames)))
+    ancient_bool = ancient_sample_indices
 
 
     # =============================================================================
@@ -601,7 +600,7 @@ def main(parameter_json,force_rerun=False):
     if optional_filtering['run_blast_masking']:
         blast_masking(blast_masking_params)
 
-    save_qc_filtered(goodpos,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name)
+    save_qc_filtered(goodpos,counts,quals,coverage_forward_strand,coverage_reverse_strand,refnti_m,p,refgenome,sampleNames,outgroup_bool,ancient_bool,contig_positions,mutantAF,maf,maNT,minorNT,minorAF,calls,hasmutation,analysis_params_output_name)
 
     if generate_projection_params['generate_projection']:
         generate_projection(generate_projection_params,goodsamples,goodpos,counts_all,quals_all,sampleNames_all)

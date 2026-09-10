@@ -150,6 +150,7 @@ rule candidate_mutation_table:
         string_qual_mat = "0-temp_pos/{reference}/string_qual_mat.txt",
         string_sampleID_names = "0-temp_pos/{reference}/string_sampleID_names.txt",
         string_outgroup_bool = "0-temp_pos/{reference}/string_outgroup_bool.txt",
+        samples_csv = "samples.csv",
         string_indel_vcf = "1-vcf/ref_{reference}_non_outgroup_indels_complex.vcf.gz"
     output:
         candidate_mutation_table = "4-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",
@@ -166,7 +167,7 @@ rule candidate_mutation_table:
     shell:
         # -c/-n optional flag to build cov/norm matrix in folder of cmt. check -h for help.
         """
-        python3 scripts/build_candidate_mutation_table_npz_script.py -r {params.REF_GENOME_DIRECTORY} -p {input.mat_positions} -s {input.string_sampleID_names} -g {input.string_outgroup_bool} -q {input.string_qual_mat} -d {input.string_diversity_mat} -i {input.string_indel_vcf} -o {output.candidate_mutation_table} -cn
+        python3 scripts/build_candidate_mutation_table_npz_script.py -r {params.REF_GENOME_DIRECTORY} -p {input.mat_positions} -s {input.string_sampleID_names} -g {input.string_outgroup_bool} -a {input.samples_csv} -q {input.string_qual_mat} -d {input.string_diversity_mat} -i {input.string_indel_vcf} -o {output.candidate_mutation_table} -cn
         """
 
 
@@ -181,4 +182,3 @@ rule cleanUp:
         "cand_mut_table_clean",
     shell:
         " rm -rf {params.temp_folder} ; touch {output} "
-

@@ -10,22 +10,27 @@ import numpy as np
 
 
 def read_samplesCSV(spls):
-    header_check = ['Path', 'Sample', 'Reference', 'Callindels', 'Outgroup']
-    parsed_samples=pd.read_csv(spls,sep=',',header=0)
+    header_check = ['Path', 'Sample', 'Reference', 'Callindels', 'Outgroup', 'Ancient']
+    parsed_samples=pd.read_csv(spls,sep=',',header=0,dtype=str)
     if list(parsed_samples.columns)!=header_check:
         raise TypeError(f'Header incorrect, should follow format : {",".join(header_check)}')
+    if parsed_samples['Sample'].duplicated().any():
+        raise ValueError('Sample names must be unique')
+    for column in ['Callindels', 'Outgroup', 'Ancient']:
+        if not parsed_samples[column].isin(['0', '1']).all():
+            raise ValueError(f'{column} must contain only boolean values encoded as 0 or 1')
     numpy_parsed=parsed_samples.to_numpy()
-    paths,samples,references,call_indels,outgroup=numpy_parsed[:,0],numpy_parsed[:,1],numpy_parsed[:,2],numpy_parsed[:,3],numpy_parsed[:,4]
+    paths,samples,references,call_indels,outgroup,ancient=numpy_parsed.T
     # confirm path exists on all paths
+    collector=[]
     for path in paths:
-        collector=[]
         if not os.path.isfile(path):
             collector.append(path)
     if len(collector)>0:
         raise ValueError(f'Paths not found for following paths {collector}')
     makelink_ancient(paths,samples,references)
     generate_freebayes_input(samples, references, call_indels, outgroup)
-    return [paths,samples,references,call_indels,outgroup] 
+    return [paths,samples,references,call_indels,outgroup,ancient]
 
 def parse_multi_genome_smpls(SAMPLE_ls,REF_Genome_ls):
     ## Expand lists if multiple genomes are used within a sample
