@@ -25,6 +25,7 @@ import pickle
 import os
 import sys,argparse
 import gzip
+import csv
 from scipy import sparse
 import vcf
 
@@ -43,6 +44,7 @@ parser.add_argument("-r", dest="refgenomedir", help="Reference genome folder",re
 parser.add_argument("-p", dest="allpositions", help="All positions p file (*mat)",required=True,action='store')
 parser.add_argument("-s", dest="sampleNames", help="File with sample names",required=True,action='store')
 parser.add_argument("-g", dest="outgroupBool", help="String outgroup bool",required=True,action='store')
+parser.add_argument("-a", dest="samples_csv", help="samples.csv containing Ancient values",required=True,action='store')
 parser.add_argument("-q", dest="qualfiles", help="String qual matrix paths",required=True,action='store')
 parser.add_argument("-d", dest="divfiles", help="String diversity paths",required=True,action='store')
 parser.add_argument("-i", dest="indelvcffiles", help="String indel vcf path",required=True,action='store')
@@ -54,12 +56,32 @@ args = parser.parse_args()
 
 '''Functions'''
 
-def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_to_outgroup_boolean_file, path_to_list_of_quals_files, path_to_list_of_diversity_files, path_to_indel_vcf, path_to_candidate_mutation_table, flag_cov_raw_sparse_matrix,flag_cov_norm_sparse_scale_matrix):
+def read_ancient_sample_indices(samples_csv, sample_names):
+    with open(samples_csv, newline='') as samples_file:
+        rows = list(csv.DictReader(samples_file))
+    if not rows or not {'Sample', 'Ancient'}.issubset(rows[0]):
+        raise ValueError('samples.csv must contain Sample and Ancient columns')
+    ancient_by_sample = {}
+    for row in rows:
+        if row['Sample'] in ancient_by_sample:
+            raise ValueError(f'Duplicate sample in samples.csv: {row["Sample"]}')
+        if row['Ancient'] not in {'0', '1'}:
+            raise ValueError(f'Ancient must contain only 0 or 1: {row["Sample"]}')
+        ancient_by_sample[row['Sample']] = row['Ancient'] == '1'
+    missing_samples = [sample for sample in sample_names if sample not in ancient_by_sample]
+    if missing_samples:
+        raise ValueError(f'Samples missing from samples.csv: {missing_samples}')
+    return np.array([ancient_by_sample[sample] for sample in sample_names], dtype=bool)
+
+
+def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_to_outgroup_boolean_file, path_to_samples_csv, path_to_list_of_quals_files, path_to_list_of_diversity_files, path_to_indel_vcf, path_to_candidate_mutation_table, flag_cov_raw_sparse_matrix,flag_cov_norm_sparse_scale_matrix):
     # get refgenome info:
     [ChrStarts,Genomelength,ScafNames]=genomestats(path_to_refgenome_dir)
+    pwd = os.getcwd(); """
 
     pwd=os.getcwd()
     
+    """
     # p: positions on genome that are candidate SNPs
     print('Processing candidate SNP positions...')
     
@@ -93,6 +115,8 @@ def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_t
     in_outgroup = in_outgroup.reshape(1,len(in_outgroup)) # reshape 2d array for analysis.py: 1row and numSamples cols
     fid.close()
     outgroup_idx=np.where(in_outgroup == '1')[1]
+    print('Processing ancient sample booleans...')
+    ancient_sample_indices = read_ancient_sample_indices(path_to_samples_csv, SampleNames)
     
     
     ## Quals: quality score (relating to sample purity) at each position for all samples
@@ -287,7 +311,7 @@ def main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_t
 
     ## Save cmt!   
     with gzip.open(path_to_candidate_mutation_table, 'wb') as f: 
-        pickle.dump([SampleNames, p, counts, Quals, in_outgroup, indel_counter, coverage_stats,indel_p,indel_depth,indel_support,indel_identites,indel_index_for_identity], f,protocol=4) # protocol=4 for storage of files >4gb
+        pickle.dump([SampleNames, p, counts, Quals, in_outgroup, ancient_sample_indices, indel_counter, coverage_stats,indel_p,indel_depth,indel_support,indel_identites,indel_index_for_identity], f,protocol=4) # protocol=4 for storage of files >4gb
     
     print('DONE')
 
@@ -296,6 +320,7 @@ if __name__ == "__main__":
     path_to_p_file=args.allpositions
     path_to_sample_names_file=args.sampleNames
     path_to_outgroup_boolean_file=args.outgroupBool
+    path_to_samples_csv=args.samples_csv
     path_to_list_of_quals_files=args.qualfiles
     path_to_list_of_diversity_files=args.divfiles
     path_to_indel_vcf=args.indelvcffiles
@@ -305,6 +330,4 @@ if __name__ == "__main__":
     if flag_cov_norm_sparse_scale_matrix and not flag_cov_raw_sparse_matrix:
         flag_cov_raw_sparse_matrix = True
         print('Selected to build double normalized coverage matrix. Raw coverage matrix will be build, too.')
-    main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_to_outgroup_boolean_file, path_to_list_of_quals_files, path_to_list_of_diversity_files, path_to_indel_vcf, path_to_candidate_mutation_table, flag_cov_raw_sparse_matrix,flag_cov_norm_sparse_scale_matrix)
-
-
+    main(path_to_refgenome_dir,path_to_p_file, path_to_sample_names_file, path_to_outgroup_boolean_file, path_to_samples_csv, path_to_list_of_quals_files, path_to_list_of_diversity_files, path_to_indel_vcf, path_to_candidate_mutation_table, flag_cov_raw_sparse_matrix,flag_cov_norm_sparse_scale_matrix)

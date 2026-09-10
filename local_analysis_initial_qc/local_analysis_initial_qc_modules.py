@@ -18,14 +18,15 @@ def read_candidate_mutation_table_pickle_gzip(file_cmt_pickle_gz):
         counts = np.array(cmt[2])
         quals = np.array(cmt[3])
         in_outgroup = np.array(cmt[4])
-        indel_counter = np.array(cmt[5])
-        coverage_stats = np.array(cmt[6]) ## each row is sample, col [0-10) == covg bins 1x, 2x... >10x; [10]==median covg; [11]==mean; [12]==stddev 
-        indel_p = np.array(cmt[7])
-        indel_depth = np.array(cmt[8])
-        indel_support = np.array(cmt[9])
-        indel_identites = np.array(cmt[10])
-        indel_index_for_identities = np.array(cmt[11])
-    return [quals,p,counts,in_outgroup,sampleNames,indel_counter,coverage_stats,indel_p,indel_depth,indel_support,indel_identites,indel_index_for_identities]
+        ancient_sample_indices = np.array(cmt[5], dtype=bool)
+        indel_counter = np.array(cmt[6])
+        coverage_stats = np.array(cmt[7]) ## each row is sample, col [0-10) == covg bins 1x, 2x... >10x; [10]==median covg; [11]==mean; [12]==stddev
+        indel_p = np.array(cmt[8])
+        indel_depth = np.array(cmt[9])
+        indel_support = np.array(cmt[10])
+        indel_identites = np.array(cmt[11])
+        indel_index_for_identities = np.array(cmt[12])
+    return [quals,p,counts,in_outgroup,ancient_sample_indices,sampleNames,indel_counter,coverage_stats,indel_p,indel_depth,indel_support,indel_identites,indel_index_for_identities]
 
 # Import of genome info
 def genomestats(REFGENOMEFOLDER):
@@ -421,4 +422,3 @@ def find_calls_near_heterozygous_sites(p, minorAF, distance_to_check, heterozygo
             if np.any(r[:,sample_index]>heterozygosity_threshold):
                 site_samples_to_mask[[range_start,range_end],sample_index]=True
     return site_samples_to_mask
-

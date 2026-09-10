@@ -15,7 +15,7 @@ minMAF = 0.1
 
 ## Format: Path,Sample,ReferenceGenome,ProviderName,Subject
 spls = "samples.csv"
-[PATH_ls,SAMPLE_ls,REF_Genome_ls,CALLINDELS_ls,OUTGROUP_ls] = read_samplesCSV(spls)
+[PATH_ls,SAMPLE_ls,REF_Genome_ls,CALLINDELS_ls,OUTGROUP_ls,ANCIENT_ls] = read_samplesCSV(spls)
 bams_ls = get_bams(SAMPLE_ls, REF_Genome_ls)
 [REF_Genome_ext_ls, SAMPLE_ext_ls] = parse_multi_genome_smpls(SAMPLE_ls, REF_Genome_ls)
 
@@ -156,4 +156,3 @@ rule generate_next_samplescsv:
     """ echo 'Path,Sample,ReferenceGenome,Outgroup' > {output.case_csv} ;"""
     " dir=$(pwd) ;"
     """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$5}}' {input.csv} >> {output.case_csv} ;"""
-
