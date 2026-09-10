@@ -18,6 +18,7 @@ spls = "samples.csv"
 [PATH_ls,SAMPLE_ls,REF_Genome_ls,CALLINDELS_ls,OUTGROUP_ls] = read_samplesCSV(spls)
 bams_ls = get_bams(SAMPLE_ls, REF_Genome_ls)
 [REF_Genome_ext_ls, SAMPLE_ext_ls] = parse_multi_genome_smpls(SAMPLE_ls, REF_Genome_ls)
+sample_to_reference = dict(zip(SAMPLE_ls, REF_Genome_ls))
 
 # grab current working directory for qc rules to use
 current_directory = os.getcwd()
@@ -30,6 +31,8 @@ rule all:
     expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
+    expand("4-bed_files/{sampleID}_genome_coverage_hist.tsv.gz", sampleID=SAMPLE_ls),
+    expand("4-bed_files/{sampleID}_merged_zero_covg_regions.tsv.gz", sampleID=SAMPLE_ls),
     "samples_case.csv",
     "cleanUp_done.txt",
     "samples.csv"
@@ -57,6 +60,52 @@ rule freebayes_indels:
         else
             freebayes-parallel <(fasta_generate_regions.py {input.fai} 100000) 72 -f {input.ref} -p 1 -L {input.non_outgroup_bam_list} > {output.vcf_raw} ;
             egrep '#|ins|del|complex' {output.vcf_raw} | gzip -c > {output.vcf_indels} ;
+        fi
+    """
+
+
+rule bedtools_coverage_histogram:
+  input:
+    bam=lambda wildcards: f"data/{sample_to_reference[wildcards.sampleID]}/{wildcards.sampleID}/{wildcards.sampleID}.bam",
+  output:
+    histogram="4-bed_files/{sampleID}_genome_coverage_hist.tsv.gz",
+  threads: 16
+  conda:
+    "envs/bedtools.yaml"
+  shell:
+    """
+        mkdir -p 4-bed_files 4-bed_files/tmp
+        tmpdir=$(mktemp -d 4-bed_files/tmp/{wildcards.sampleID}.hist.XXXXXX)
+        trap 'rm -rf "$tmpdir"' EXIT
+        samtools view -b -F 4 -q 30 {input.bam} > "$tmpdir/filtered.bam"
+        bedtools genomecov -ibam "$tmpdir/filtered.bam" | gzip -c > {output.histogram}
+    """
+
+
+rule bedtools_zero_coverage:
+  input:
+    bam=lambda wildcards: f"data/{sample_to_reference[wildcards.sampleID]}/{wildcards.sampleID}/{wildcards.sampleID}.bam",
+  output:
+    zero_coverage="4-bed_files/{sampleID}_merged_zero_covg_regions.tsv.gz",
+  params:
+    merge_distance=500,
+  threads: 16
+  conda:
+    "envs/bedtools.yaml"
+  shell:
+    """
+        mkdir -p 4-bed_files 4-bed_files/tmp
+        tmpdir=$(mktemp -d 4-bed_files/tmp/{wildcards.sampleID}.zero.XXXXXX)
+        trap 'rm -rf "$tmpdir"' EXIT
+        samtools view -b -F 4 -q 30 {input.bam} > "$tmpdir/filtered.bam"
+        bedtools genomecov -bga -ibam "$tmpdir/filtered.bam" > "$tmpdir/all_positions.tsv"
+        awk -F'\t' '{{if ($NF == 0) print}}' "$tmpdir/all_positions.tsv" > "$tmpdir/zero_coverage.bed"
+        if [ -s "$tmpdir/zero_coverage.bed" ]; then
+            bedtools merge -d {params.merge_distance} -i "$tmpdir/zero_coverage.bed" > "$tmpdir/merged_zero_coverage.bed"
+            bedtools coverage -b "$tmpdir/filtered.bam" -a "$tmpdir/merged_zero_coverage.bed" -hist |
+                awk -F'\t' '{{if ($4 == 0) print}}' | gzip -c > {output.zero_coverage}
+        else
+            gzip -c /dev/null > {output.zero_coverage}
         fi
     """
 
@@ -156,4 +205,3 @@ rule generate_next_samplescsv:
     """ echo 'Path,Sample,ReferenceGenome,Outgroup' > {output.case_csv} ;"""
     " dir=$(pwd) ;"
     """ awk -v dir="$dir" 'BEGIN{{FS=OFS=","}} NR>1 {{print dir,$2,$3,$5}}' {input.csv} >> {output.case_csv} ;"""
-
