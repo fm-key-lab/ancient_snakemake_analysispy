@@ -28,9 +28,9 @@ current_directory = os.getcwd()
 
 rule all:
   input:
+    expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
     expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
     expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
-    expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
     expand("4-bed_files/{sampleID}_genome_coverage_hist.tsv.gz", sampleID=SAMPLE_ls),
     expand("4-bed_files/{sampleID}_merged_zero_covg_regions.tsv.gz", sampleID=SAMPLE_ls),
     "samples_case.csv",
