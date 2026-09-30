@@ -347,7 +347,7 @@ def filter_bed_cov_hist(bed_paths,p,scafNames,chrStarts,sampleNames,coverage,cut
                     end=p_chr_indices[index+1]
                     p_to_include_this_chrom=np.array(range(start,end)) ## true/false 
                 else:
-                    p_to_include_this_chrom=np.array(range(start,len(p)))
+                    p_to_include_this_chrom=np.array(range(0,len(p)))
                 to_mask=p_to_include_this_chrom[np.isin(p_to_include_this_chrom,np.where(coverage[:,this_bed_index] > this_sample_name_cutoffs_this_scaf)[0])]
                 to_be_masked_array_covg_percentile[to_mask,this_bed_index]=True
     return to_be_masked_array_covg_percentile
