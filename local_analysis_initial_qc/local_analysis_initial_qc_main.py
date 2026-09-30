@@ -103,7 +103,7 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,coverage,scafNames,chr
         return failed_metagenomic
 
     # confirm paths exist for bedfiles, and all samples are represented
-    bed_dir = '../../../bed_files/'
+    bed_dir = '../../../4-bed_files/'
     if not os.path.exists(bed_dir):
         raise FileNotFoundError(f"Bed files for metagenomic filtering not found. Expected directory '{bed_dir}' is missing.")
 
