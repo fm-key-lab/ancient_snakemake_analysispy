@@ -107,9 +107,6 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,coverage,scafNames,chr
     if not os.path.exists(bed_dir):
         raise FileNotFoundError(f"Bed files for metagenomic filtering not found. Expected directory '{bed_dir}' is missing.")
 
-    bed_histogram_path = os.path.join(bed_dir, '*_genome_coverage_hist.tsv.gz')
-    bed_zero_covg_path = os.path.join(bed_dir, '*_merged_zero_covg_regions.tsv.gz')
-
     ancient_sample_names = np.asarray(sampleNames)[np.asarray(ancient_bool)]
     missing_bed_files = []
     bed_histogram_validated_paths=[]

@@ -292,7 +292,8 @@ def filter_bed_0_cov_regions(bed_paths,p,scafNames,chrStarts,sampleNames,cutoff)
         else:
             to_mask=parse_bed_zero_covg_regions(bed_zero,p,scafNames,chrStarts,cutoff)
             ## now, mask positions above the percentile 
-            to_be_masked_array_0_covg_regions[to_mask,this_bed_index]=True
+            if len(to_mask)>0:
+                to_be_masked_array_0_covg_regions[to_mask,this_bed_index]=True
     return to_be_masked_array_0_covg_regions
 
 def parse_bed_zero_covg_regions(path_to_bed_zero_covg_covg, p, scafNames, chrStarts, cutoff):
@@ -316,12 +317,12 @@ def parse_bed_zero_covg_regions(path_to_bed_zero_covg_covg, p, scafNames, chrSta
             if float(line[6]) > cutoff:
                 to_add_to_range = chrStarts[np.where(scafNames == line[0])[0]][0]
                 output_set.update([x for x in range(int(line[1]) + to_add_to_range, int(line[2]) + 1 + to_add_to_range)])
-    should_be_masked = []
+    to_mask_zero_covg = []
     for index, pos in enumerate(p):
         if pos in output_set:
-            should_be_masked.append(index)
-    should_be_masked = np.array(should_be_masked)
-    return should_be_masked
+            to_mask_zero_covg.append(index)
+    to_mask_zero_covg = np.array(to_mask_zero_covg,dtype=int)
+    return to_mask_zero_covg
 
 def filter_bed_cov_hist(bed_paths,p,scafNames,chrStarts,sampleNames,coverage,cutoff,two_tailed=False,upper=True):
     """
@@ -347,7 +348,7 @@ def filter_bed_cov_hist(bed_paths,p,scafNames,chrStarts,sampleNames,coverage,cut
                     p_to_include_this_chrom=np.array(range(start,end)) ## true/false 
                 else:
                     p_to_include_this_chrom=np.array(range(start,len(p)))
-                to_mask=p_to_include_this_chrom[np.isin(p_to_include_this_chrom,np.where(coverage[:,this_sample_index] > this_sample_name_cutoffs_this_scaf)[0])]
+                to_mask=p_to_include_this_chrom[np.isin(p_to_include_this_chrom,np.where(coverage[:,this_bed_index] > this_sample_name_cutoffs_this_scaf)[0])]
                 to_be_masked_array_covg_percentile[to_mask,this_bed_index]=True
     return to_be_masked_array_covg_percentile
 
