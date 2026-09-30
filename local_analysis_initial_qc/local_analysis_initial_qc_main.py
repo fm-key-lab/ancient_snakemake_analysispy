@@ -18,6 +18,7 @@ import pickle
 import numpy as np
 import gzip
 import json
+import glob
 
 sys.path.append("./local_analysis_initial_qc")
 import local_analysis_initial_qc_modules as apy
@@ -102,7 +103,7 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,coverage,scafNames,chr
         return failed_metagenomic
 
     # confirm paths exist for bedfiles, and all samples are represented
-    bed_dir = 'bed_files/'
+    bed_dir = '../../../bed_files/'
     if not os.path.exists(bed_dir):
         raise FileNotFoundError(f"Bed files for metagenomic filtering not found. Expected directory '{bed_dir}' is missing.")
 
@@ -111,13 +112,19 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,coverage,scafNames,chr
 
     ancient_sample_names = np.asarray(sampleNames)[np.asarray(ancient_bool)]
     missing_bed_files = []
+    bed_histogram_validated_paths=[]
+    bed_zero_covg_validated_paths=[]
     for sample_name in ancient_sample_names:
         expected_hist = os.path.join(bed_dir, f'{sample_name}_genome_coverage_hist.tsv.gz')
         expected_zero = os.path.join(bed_dir, f'{sample_name}_merged_zero_covg_regions.tsv.gz')
         if not os.path.isfile(expected_hist):
             missing_bed_files.append(expected_hist)
+        else:
+            bed_histogram_validated_paths.append(expected_hist)
         if not os.path.isfile(expected_zero):
             missing_bed_files.append(expected_zero)
+        else:
+            bed_zero_covg_validated_paths.append(expected_zero)
 
     if missing_bed_files:
         missing_bed_files_str = '\n'.join(sorted(set(missing_bed_files)))
@@ -127,15 +134,13 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,coverage,scafNames,chr
         )
 
     failed_genomic_islands = np.full(calls.shape, False)
-    zero_covg_files = glob.glob(bed_zero_covg_path)
-    if zero_covg_files:
-        failed_genomic_islands = apy.filter_bed_0_cov_regions(bed_zero_covg_path,p,scafNames,chrStarts,sampleNames,filter_site_per_sample_params['max_prop_0_covg_ancient'])
+    if bed_zero_covg_validated_paths:
+        failed_genomic_islands = apy.filter_bed_0_cov_regions(bed_zero_covg_validated_paths,p,scafNames,chrStarts,sampleNames,filter_site_per_sample_params['max_prop_0_covg_ancient'])
         failed_genomic_islands[:,~ancient_bool]=False
 
     failed_coverage_percentile = np.full(calls.shape, False)
-    hist_files = glob.glob(bed_histogram_path)
-    if hist_files:
-        failed_coverage_percentile = apy.filter_bed_cov_hist(bed_histogram_path,p,scafNames,chrStarts,sampleNames,coverage,filter_site_per_sample_params['max_percentile_cov_ancient'],two_tailed=False,upper=True)
+    if bed_histogram_validated_paths:
+        failed_coverage_percentile = apy.filter_bed_cov_hist(bed_histogram_validated_paths,p,scafNames,chrStarts,sampleNames,coverage,filter_site_per_sample_params['max_percentile_cov_ancient'],two_tailed=False,upper=True)
         failed_coverage_percentile[:,~ancient_bool]=False
 
     ## Removing SNP calls that are very close to nearby heterozygosity per sample (10bp default)
@@ -398,8 +403,7 @@ def main(parameter_json,force_rerun=False):
         outgroup_bool=np.zeros(len(sampleNames)).astype(bool)
 
     ancient_samples=json_parsed['sample_labelling']['ancient_samples'].split(',')
-    ancient_pattern = re.compile(r'^SP\.*|^M219')
-    ancient_bool = np.isin(sampleNames,list(filter(ancient_pattern.match, sampleNames)))
+    ancient_bool = np.isin(sampleNames,ancient_samples)
 
 
     # =============================================================================
@@ -568,7 +572,7 @@ def main(parameter_json,force_rerun=False):
     # ancient singleton validation # 
     # # # # # # # # # # # # # # # # 
     # # # #
-    ancient_singletons = np.intersect1d(candpos,np.where((np.sum(hasmutation[:,np.in1d(sampleNames,ancient_sample_names)],axis=1)==1) & (np.sum(hasmutation[:,~np.in1d(sampleNames,ancient_sample_names)],axis=1)==0))[0])
+    ancient_singletons = np.intersect1d(candpos,np.where((np.sum(hasmutation[:,np.isin(sampleNames,ancient_sample_names)],axis=1)==1) & (np.sum(hasmutation[:,~np.isin(sampleNames,ancient_sample_names)],axis=1)==0))[0])
 
     for pos in ancient_singletons:
         samples=[x for x in sampleNames[hasmutation[p==p[pos]][0]] if x in ancient_sample_names]
@@ -728,7 +732,7 @@ def update_matrices_post_singleton_counts_update(counts_updated,calls_previous,m
         if 0 < num_reads_passed < pileup_coverage:
             singletons_to_mask_possibly_fine.append(p_index_this_query)
             #print(f'Passed: {num_reads_passed}, Assessed: {reads_assessed}, Total Coverage: {pileup_coverage}')
-        call_support_remaining=cleaned_calls[np.in1d(cleaned_reads,np.array(reads_passed))]
+        call_support_remaining=cleaned_calls[np.isin(cleaned_reads,np.array(reads_passed))]
         counts=update_counts_for_singleton(counts,call_support_remaining,sample_index_this_query,p_index_this_query)
 
     # outputting reads that failed check of origin to pestis or pseudotb
