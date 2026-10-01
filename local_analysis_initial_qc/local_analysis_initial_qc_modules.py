@@ -226,34 +226,6 @@ def div_major_allele_freq(cnts,return_all_minorAF=False):
 ## # # # # # # # # # # # # # # # # All Filtering Functions # # # # # # # # # # # # # # # # # # # ##
 ###################################################################################################
 # IO
-def parse_bed_zero_covg_regions(path_to_bed_zero_covg_covg, p, scafNames, chrStarts, cutoff):
-    """
-    Generates an array of positions that should be masked due to falling within coverage islands.
-    Reach to get to the next coverage island defined elsewhere (snakemake, other script) but cutoff
-    defines % of uncovered region which must be uncovered to mask any covered positions within.
-
-    e.g., covg = =======
-         noncovered = _
-         genome: ====___________________=_____________
-
-         remove the isolated = covered position as likely contamination
-    """
-    # Use gzip.open for gzipped files
-    print(f'Processing bed zero coverage file: {path_to_bed_zero_covg_covg}')
-    with gzip.open(path_to_bed_zero_covg_covg, mode='rt') as file:  # Note the 'rt' mode for reading text
-        lines = csv.reader(file, delimiter="\t")
-        output_set = set()
-        for line in lines:
-            if float(line[6]) > cutoff:
-                to_add_to_range = chrStarts[np.where(scafNames == line[0])[0]][0]
-                output_set.update([x for x in range(int(line[1]) + to_add_to_range, int(line[2]) + 1 + to_add_to_range)])
-    should_be_masked = []
-    for index, pos in enumerate(p):
-        if pos in output_set:
-            should_be_masked.append(index)
-    should_be_masked = np.array(should_be_masked)
-    return should_be_masked
-
 # filtering
 def create_ranges(test_p,dist_to_run):
     # much more efficient version of old check for recombination range creation
@@ -309,27 +281,64 @@ def findrecombinantSNPs(p, mutantAF, distance_for_nonsnp, corr_threshold_recombi
     nonsnp_bool = nonsnp_bool.astype(bool)
     return [nonsnp_idx, nonsnp_bool]
 
-def filter_bed_cov_hist(bed_path,p,scafNames,chrStarts,sampleNames,coverage,cutoff,two_tailed=False,upper=True):
+def filter_bed_0_cov_regions(bed_paths,p,scafNames,chrStarts,sampleNames,cutoff):
+    """outputs a boolean matrix of index of [p]x[samplenames] to mask from basecall, due to being in regions of 0 coverage (eg are coverage islands)"""
+    # generate output matrix
+    to_be_masked_array_0_covg_regions=np.full((len(p),len(sampleNames)),False)
+    for bed_paths_index,bed_zero in enumerate(bed_paths):
+        this_bed_index=np.where(np.isin(sampleNames,bed_zero.replace('_merged_zero_covg_regions.tsv.gz','').split('/')[-1]))[0]
+        if this_bed_index.size != 1:
+            print(f'Warning: Bedfile {bed_zero} does not have a corresponding samplename in sampleNames input array, skipping.')
+        else:
+            to_mask=parse_bed_zero_covg_regions(bed_zero,p,scafNames,chrStarts,cutoff)
+            ## now, mask positions above the percentile 
+            if len(to_mask)>0:
+                to_be_masked_array_0_covg_regions[to_mask,this_bed_index]=True
+    return to_be_masked_array_0_covg_regions
+
+def parse_bed_zero_covg_regions(path_to_bed_zero_covg_covg, p, scafNames, chrStarts, cutoff):
+    """
+    Generates an array of positions that should be masked due to falling within coverage islands.
+    Reach to get to the next coverage island defined elsewhere (snakemake, other script) but cutoff
+    defines % of uncovered region which must be uncovered to mask any covered positions within.
+
+    e.g., covg = =======
+         noncovered = _
+         genome: ====___________________=_____________
+
+         remove the isolated = covered position as likely contamination
+    """
+    # Use gzip.open for gzipped files
+    print(f'Processing bed zero coverage file: {path_to_bed_zero_covg_covg}')
+    with gzip.open(path_to_bed_zero_covg_covg, mode='rt') as file:  # Note the 'rt' mode for reading text
+        lines = csv.reader(file, delimiter="\t")
+        output_set = set()
+        for line in lines:
+            if float(line[6]) > cutoff:
+                to_add_to_range = chrStarts[np.where(scafNames == line[0])[0]][0]
+                output_set.update([x for x in range(int(line[1]) + to_add_to_range, int(line[2]) + 1 + to_add_to_range)])
+    to_mask_zero_covg = []
+    for index, pos in enumerate(p):
+        if pos in output_set:
+            to_mask_zero_covg.append(index)
+    to_mask_zero_covg = np.array(to_mask_zero_covg,dtype=int)
+    return to_mask_zero_covg
+
+def filter_bed_cov_hist(bed_paths,p,scafNames,chrStarts,sampleNames,coverage,cutoff,two_tailed=False,upper=True):
     """
     NOTE: For ancient DNA quality control!!!
     outputs a boolean matrix of index of [p]x[samplenames] to mask from basecall, due to being in the top coverage percentile when using bedtools coverage histogram (or bottom if upper=False, or if two_tailed=True)"""
-    # get paths
-    bed_histogram_files = glob.glob(bed_path)
     # index accounting
     p_chr_indices=[0]+[np.max(np.where(p < x + 1))+1 for x in chrStarts[1:]]
     # generate output matrix
     to_be_masked_array_covg_percentile=np.full(coverage.shape,False)
-    for bed_index,bed_hist in enumerate(bed_histogram_files):
-        this_sample_index=-1
-        print(f'Processing bed covg hist file: {bed_hist}')
-        for index,samplename in enumerate(sampleNames):
-            if samplename in bed_hist:
-                this_sample_index=index
-        if this_sample_index==-1:
+    for bed_index,bed_hist in enumerate(bed_paths):
+        this_bed_index=np.where(np.isin(sampleNames,bed_hist.replace('_genome_coverage_hist.tsv.gz','').split('/')[-1]))[0]
+        if this_bed_index.size != 1:
             print(f'Warning: Bedfile {bed_hist} does not have a corresponding samplename in sampleNames input array, skipping.')
         else:
             this_sample_name_cutoffs=cutoff_bed_covg_histograms(bed_hist,cutoff,two_tailed,upper)
-            print(this_sample_name_cutoffs)
+            # print(this_sample_name_cutoffs)
             ## now, mask positions above the percentile, by individual chrom cutoffs
             for index,scaf in enumerate(scafNames):
                 this_sample_name_cutoffs_this_scaf=this_sample_name_cutoffs[scaf][1]
@@ -338,29 +347,11 @@ def filter_bed_cov_hist(bed_path,p,scafNames,chrStarts,sampleNames,coverage,cuto
                     end=p_chr_indices[index+1]
                     p_to_include_this_chrom=np.array(range(start,end)) ## true/false 
                 else:
-                    p_to_include_this_chrom=np.array(range(start,len(p)))
-                to_mask=p_to_include_this_chrom[np.in1d(p_to_include_this_chrom,np.where(coverage[:,this_sample_index] > this_sample_name_cutoffs_this_scaf)[0])]
-                to_be_masked_array_covg_percentile[to_mask,this_sample_index]=True
+                    p_to_include_this_chrom=np.array(range(0,len(p)))
+                to_mask=p_to_include_this_chrom[np.isin(p_to_include_this_chrom,np.where(coverage[:,this_bed_index] > this_sample_name_cutoffs_this_scaf)[0])]
+                if len(to_mask)>0:
+                    to_be_masked_array_covg_percentile[to_mask,this_bed_index]=True
     return to_be_masked_array_covg_percentile
-
-def filter_bed_0_cov_regions(bed_path,p,scafNames,chrStarts,sampleNames,cutoff):
-    """outputs a boolean matrix of index of [p]x[samplenames] to mask from basecall, due to being in regions of 0 coverage (eg are coverage islands)"""
-    # get paths
-    bed_zero_covg_files=glob.glob(bed_path)
-    # generate output matrix
-    to_be_masked_array_0_covg_regions=np.full((len(p),len(sampleNames)),False)
-    for bed_index,bed_zero in enumerate(bed_zero_covg_files):
-        this_sample_index=-1
-        for index,samplename in enumerate(sampleNames):
-            if samplename in bed_zero:
-                this_sample_index=index
-        if this_sample_index==-1:
-            print(f'Warning: Bedfile {bed_zero} does not have a corresponding samplename in sampleNames input array, skipping.')
-        else:
-            to_mask=parse_bed_zero_covg_regions(bed_zero,p,scafNames,chrStarts,cutoff)
-            ## now, mask positions above the percentile 
-            to_be_masked_array_0_covg_regions[to_mask,this_sample_index]=True
-    return to_be_masked_array_0_covg_regions
 
 def cutoff_bed_covg_histograms(path_to_bed_covg_hist, cutoff, two_tailed=True, upper=True):
     """generates dictionary of scafnames --> cutoff values for coverage, based on bedtools covg histogram"""
@@ -409,7 +400,7 @@ def find_calls_near_heterozygous_sites(p, minorAF, distance_to_check, heterozygo
     NOTE: By default, SNPs called N will be factored into the correlation matrix, not recommended with ancient data (!!)
     hackathon add default behavior (either by using calls matrix (but does covar matrix work with that? or just has mut and calls matrix))
     """
-    #look for recombination regions
+    #look for heterozygous regions
     if len(indices_of_ancient_samples) == 0:
         print('Conducting nearby heterozygosity check on all samples, note: this filter should only be applied to ancient samples!')
         indices_of_ancient_samples=np.array([x for x in range(0,minorAF.shape[1])])

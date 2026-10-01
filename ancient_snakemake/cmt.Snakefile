@@ -44,7 +44,7 @@ rule all:
         # expand("data/qual/{sampleID}_ref_{reference}_outgroup{outgroup}.quals.mat",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
         # expand("data/diversity/{sampleID}_ref_{reference}_outgroup{outgroup}.diversity.mat",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
         # # Everything # #
-        expand("4-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",reference=set(REF_Genome_ls)) ## for each unique entry (set()) the output is expected
+        expand("5-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",reference=set(REF_Genome_ls)) ## for each unique entry (set()) the output is expected
         # # Including cleanup step # #
         #"logs/DONE_cleanUp",
 
@@ -152,9 +152,9 @@ rule candidate_mutation_table:
         string_outgroup_bool = "0-temp_pos/{reference}/string_outgroup_bool.txt",
         string_indel_vcf = "1-vcf/ref_{reference}_non_outgroup_indels_complex.vcf.gz"
     output:
-        candidate_mutation_table = "4-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",
-        raw_sparse_cov_matrix = "4-candidate_mutation_table/{reference}/cov_raw_sparsecsr_mat.npz",
-        double_norm_sparse_cov_matrix = "4-candidate_mutation_table/{reference}/cov_norm_sparsecsr_mat.npz", ## sparse coverage matrix normalized over samples and positions 
+        candidate_mutation_table = "5-candidate_mutation_table/{reference}/candidate_mutation_table.pickle.gz",
+        raw_sparse_cov_matrix = "5-candidate_mutation_table/{reference}/cov_raw_sparsecsr_mat.npz",
+        double_norm_sparse_cov_matrix = "5-candidate_mutation_table/{reference}/cov_norm_sparsecsr_mat.npz", ## sparse coverage matrix normalized over samples and positions 
     params:
         REF_GENOME_DIRECTORY = "/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/"
     resources:
