@@ -489,7 +489,7 @@ def main(parameter_json,force_rerun=False):
     intermediate_hasmutation_post_sample_checks[:,outgroup_bool] = False
     intermediate_num_variants=len(np.where( np.sum(intermediate_hasmutation_post_sample_checks, axis=1) > 0 )[0])
     variants_removed_failed_within_sample=len(p)-intermediate_num_variants
-    print("Filtering step within_sample_checks")
+    print("Filtering step: within_sample_checks")
     print("Number of variants after this filtering step: ", intermediate_num_variants)
     print("Number of variants removed: ", variants_removed_failed_within_sample)
 
@@ -501,7 +501,7 @@ def main(parameter_json,force_rerun=False):
     intermediate_num_variants=len(np.where( np.sum(intermediate_hasmutation_post_sample_checks_and_metagenomics, axis=1) > 0 )[0])
     variants_removed_failed_within_sample_failed_metagenomics=len(p)-variants_removed_failed_within_sample-intermediate_num_variants
 
-    print("Filtering step metagenomic_checks")
+    print("Filtering step: metagenomic_checks")
     print("Number of variants after this filtering step: ", intermediate_num_variants)
     print("Number of variants removed: ", variants_removed_failed_within_sample_failed_metagenomics)
 
@@ -519,6 +519,8 @@ def main(parameter_json,force_rerun=False):
 
     # Across sample checks 
     ## Remove putative recombinants
+    print("Filtering step: cross-sample site filtering")
+
     failed_any_QC = ( failed_metagenomic | failed_within_sample)
 
     failed_recombinants=recombinant_check(optional_filtering,p,mutantAF,ingroup_bool,ancient_bool,filter_site_across_samples_params,failed_any_QC,force_rerun)

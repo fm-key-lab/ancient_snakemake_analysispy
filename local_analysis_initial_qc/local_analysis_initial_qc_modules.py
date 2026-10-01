@@ -338,7 +338,7 @@ def filter_bed_cov_hist(bed_paths,p,scafNames,chrStarts,sampleNames,coverage,cut
             print(f'Warning: Bedfile {bed_hist} does not have a corresponding samplename in sampleNames input array, skipping.')
         else:
             this_sample_name_cutoffs=cutoff_bed_covg_histograms(bed_hist,cutoff,two_tailed,upper)
-            print(this_sample_name_cutoffs)
+            # print(this_sample_name_cutoffs)
             ## now, mask positions above the percentile, by individual chrom cutoffs
             for index,scaf in enumerate(scafNames):
                 this_sample_name_cutoffs_this_scaf=this_sample_name_cutoffs[scaf][1]
@@ -349,7 +349,8 @@ def filter_bed_cov_hist(bed_paths,p,scafNames,chrStarts,sampleNames,coverage,cut
                 else:
                     p_to_include_this_chrom=np.array(range(0,len(p)))
                 to_mask=p_to_include_this_chrom[np.isin(p_to_include_this_chrom,np.where(coverage[:,this_bed_index] > this_sample_name_cutoffs_this_scaf)[0])]
-                to_be_masked_array_covg_percentile[to_mask,this_bed_index]=True
+                if len(to_mask)>0:
+                    to_be_masked_array_covg_percentile[to_mask,this_bed_index]=True
     return to_be_masked_array_covg_percentile
 
 def cutoff_bed_covg_histograms(path_to_bed_covg_hist, cutoff, two_tailed=True, upper=True):
@@ -399,7 +400,7 @@ def find_calls_near_heterozygous_sites(p, minorAF, distance_to_check, heterozygo
     NOTE: By default, SNPs called N will be factored into the correlation matrix, not recommended with ancient data (!!)
     hackathon add default behavior (either by using calls matrix (but does covar matrix work with that? or just has mut and calls matrix))
     """
-    #look for recombination regions
+    #look for heterozygous regions
     if len(indices_of_ancient_samples) == 0:
         print('Conducting nearby heterozygosity check on all samples, note: this filter should only be applied to ancient samples!')
         indices_of_ancient_samples=np.array([x for x in range(0,minorAF.shape[1])])
