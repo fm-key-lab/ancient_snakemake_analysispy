@@ -133,19 +133,16 @@ def metagenomic_checks(optional_filtering,p,calls,minorAF,coverage,scafNames,chr
     failed_genomic_islands = np.full(calls.shape, False)
     if bed_zero_covg_validated_paths:
         failed_genomic_islands = apy.filter_bed_0_cov_regions(bed_zero_covg_validated_paths,p,scafNames,chrStarts,sampleNames,filter_site_per_sample_params['max_prop_0_covg_ancient'])
-        failed_genomic_islands[:,~ancient_bool]=False
 
     failed_coverage_percentile = np.full(calls.shape, False)
     if bed_histogram_validated_paths:
         failed_coverage_percentile = apy.filter_bed_cov_hist(bed_histogram_validated_paths,p,scafNames,chrStarts,sampleNames,coverage,filter_site_per_sample_params['max_percentile_cov_ancient'],two_tailed=False,upper=True)
-        failed_coverage_percentile[:,~ancient_bool]=False
 
     ## Removing SNP calls that are very close to nearby heterozygosity per sample (10bp default)
     if optional_filtering['heterozygosity'] == 'All':
         failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1)
     elif optional_filtering['heterozygosity'] == 'Ancient':
-        failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1)
-        failed_heterozygosity[:,~ancient_bool]=False
+        failed_heterozygosity=apy.find_calls_near_heterozygous_sites(p,minorAF,10,0.1,ancient_bool.nonzero()[0])
     else: 
         failed_heterozygosity = np.full(calls.shape, False)
 
