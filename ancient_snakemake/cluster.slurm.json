@@ -25,6 +25,18 @@
         "output"         : "logs/{rule}_ref_{wildcards.reference}_%j.out.txt",
         "error"          : "logs/{rule}_ref_{wildcards.reference}_%j.err.txt",
     },
+    "bedtools_coverage_histogram" : {
+        "mem"            : 50000,
+        "cpus-per-task"  : 16,
+        "output"         : "logs/{rule}_{wildcards.sampleID}_%j.out.txt",
+        "error"          : "logs/{rule}_{wildcards.sampleID}_%j.err.txt",
+    },
+    "bedtools_zero_coverage" : {
+        "mem"            : 50000,
+        "cpus-per-task"  : 16,
+        "output"         : "logs/{rule}_{wildcards.sampleID}_%j.out.txt",
+        "error"          : "logs/{rule}_{wildcards.sampleID}_%j.err.txt",
+    },
     "mpileup2vcf_ancient" : {
         "output"         : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.out.txt",
         "error"          : "logs/{rule}_ref_{wildcards.reference}_{wildcards.sampleID}_%j.err.txt",
