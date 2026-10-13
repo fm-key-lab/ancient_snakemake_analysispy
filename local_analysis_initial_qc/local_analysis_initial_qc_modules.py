@@ -329,7 +329,7 @@ def filter_bed_cov_hist(bed_paths,p,scafNames,chrStarts,sampleNames,coverage,cut
     NOTE: For ancient DNA quality control!!!
     outputs a boolean matrix of index of [p]x[samplenames] to mask from basecall, due to being in the top coverage percentile when using bedtools coverage histogram (or bottom if upper=False, or if two_tailed=True)"""
     # index accounting
-    p_chr_indices=[0]+[np.max(np.where(p < x + 1))+1 for x in chrStarts[1:]]
+    p_coverted_chrpos=p2chrpos(p, chrStarts)
     # generate output matrix
     to_be_masked_array_covg_percentile=np.full(coverage.shape,False)
     for bed_index,bed_hist in enumerate(bed_paths):
@@ -338,16 +338,10 @@ def filter_bed_cov_hist(bed_paths,p,scafNames,chrStarts,sampleNames,coverage,cut
             print(f'Warning: Bedfile {bed_hist} does not have a corresponding samplename in sampleNames input array, skipping.')
         else:
             this_sample_name_cutoffs=cutoff_bed_covg_histograms(bed_hist,cutoff,two_tailed,upper)
-            # print(this_sample_name_cutoffs)
             ## now, mask positions above the percentile, by individual chrom cutoffs
             for index,scaf in enumerate(scafNames):
+                p_to_include_this_chrom=np.where(p_coverted_chrpos[:,0]==index+1)[0]
                 this_sample_name_cutoffs_this_scaf=this_sample_name_cutoffs[scaf][1]
-                if index<len(scafNames)-1:
-                    start=p_chr_indices[index]
-                    end=p_chr_indices[index+1]
-                    p_to_include_this_chrom=np.array(range(start,end)) ## true/false 
-                else:
-                    p_to_include_this_chrom=np.array(range(0,len(p)))
                 to_mask=p_to_include_this_chrom[np.isin(p_to_include_this_chrom,np.where(coverage[:,this_bed_index] > this_sample_name_cutoffs_this_scaf)[0])]
                 if len(to_mask)>0:
                     to_be_masked_array_covg_percentile[to_mask,this_bed_index]=True
