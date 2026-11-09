@@ -34,7 +34,6 @@ rule all:
     expand("4-bed_files/{sampleID}_genome_coverage_hist.tsv.gz", sampleID=SAMPLE_ls),
     expand("4-bed_files/{sampleID}_merged_zero_covg_regions.tsv.gz", sampleID=SAMPLE_ls),
     "samples_case.csv",
-    "cleanUp_done.txt",
     "samples.csv"
 
 rule freebayes_indels:
@@ -69,13 +68,13 @@ rule mpileup2vcf_ancient:
     bam="data/{reference}/{sampleID}/{sampleID}.bam",
     ref="/nexus/posix0/MPIIB-keylab/reference_genomes/{reference}/genome.fasta",
   output:
-    pileup="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
+    pileup=temp("1-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup"),
     variants="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
     vcf_strain="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
+    vcf_raw=temp("1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz"),
   group:
     'pileup_and_filter', 
   params:
-    vcf_raw="1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
     minMAF = minMAF,
     regions = "{reference}_regions.bed",
   conda:
@@ -85,15 +84,15 @@ rule mpileup2vcf_ancient:
         if [ -e {params.regions} ]; then 
             echo "regions file specified, generating mutations only on regions defined in regions.bed."
             samtools mpileup -l {params.regions} -q30 -x -s -O -d3000 -f {input.ref} {input.bam} > {output.pileup} ;
-            samtools mpileup -l {params.regions} -q30 -t SP -d3000 -vf {input.ref} {input.bam} > {params.vcf_raw} ;
-            bcftools call -c -Oz -o {output.vcf_strain} {params.vcf_raw} ;
+            samtools mpileup -l {params.regions} -q30 -t SP -d3000 -vf {input.ref} {input.bam} > {output.vcf_raw} ;
+            bcftools call -c -Oz -o {output.vcf_strain} {output.vcf_raw} ;
             bcftools view -Oz -v snps -q {params.minMAF} {output.vcf_strain} > {output.variants} ;
             tabix -p vcf {output.variants} ;
         else 
             echo "regions.bed file does not exist, output will be across full genome";
             samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bam} > {output.pileup} ;
-            samtools mpileup -q30 -t SP -d3000 -vf {input.ref} {input.bam} > {params.vcf_raw} ;
-            bcftools call -c -Oz -o {output.vcf_strain} {params.vcf_raw} ;
+            samtools mpileup -q30 -t SP -d3000 -vf {input.ref} {input.bam} > {output.vcf_raw} ;
+            bcftools call -c -Oz -o {output.vcf_strain} {output.vcf_raw} ;
             bcftools view -Oz -v snps -q {params.minMAF} {output.vcf_strain} > {output.variants} ;
             tabix -p vcf {output.variants} ;
         fi
@@ -173,22 +172,14 @@ rule bedtools_zero_coverage:
         fi
     """
 
-rule cleanUp_ancient:
-  input:
-    removal_part1 = expand("1-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input for deletion
-    removal_part2 = expand("1-vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input for deletion
-    checkpoint_part1 = expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input not used, only required so snakemake waits with clean up until the end
-    checkpoint_part2 = expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),  # input not used, only required so snakemake waits with clean up until the end
-  output:
-    "cleanUp_done.txt",
-  shell:
-    " rm {input.removal_part1} ;"
-    " rm {input.removal_part2} ;"
-    " touch {output} ;"
-
 rule generate_next_samplescsv:
   input: 
     csv = "samples.csv",
+    expand("1-vcf/ref_{reference}_freebayes_raw_joint_calls.vcf",reference=set(REF_Genome_ext_ls)),
+    expand("2-quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
+    expand("3-diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.npz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
+    expand("4-bed_files/{sampleID}_genome_coverage_hist.tsv.gz", sampleID=SAMPLE_ls),
+    expand("4-bed_files/{sampleID}_merged_zero_covg_regions.tsv.gz", sampleID=SAMPLE_ls),
   output:
     case_csv = "samples_case.csv",
   shell: 
